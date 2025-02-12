@@ -19,16 +19,29 @@ package controller
 import (
 	"context"
 
+	"giantswarm.io/image-distribution-operator/pkg/image"
+	"giantswarm.io/image-distribution-operator/pkg/imagelist"
+
+	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	ReleaseControllerFinalizer = "image-distribution-operator.finalizers.giantswarm.io/release-controller"
 )
 
 // ReleaseReconciler reconciles a Release object
 type ReleaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Log                logr.Logger
+	Scheme             *runtime.Scheme
+	ImageListName      string
+	ImageListNamespace string
 }
 
 // +kubebuilder:rbac:groups=release.giantswarm.io.giantswarm.io,resources=releases,verbs=get;list;watch;create;update;patch;delete
@@ -45,9 +58,66 @@ type ReleaseReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := r.Log.WithValues("release", req.NamespacedName)
 
-	// TODO(user): your logic here
+	// Fetch the Release
+	release := &v1alpha1.Release{}
+	if err := r.Get(ctx, req.NamespacedName, release); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Object not found. Return
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
+	}
+
+	flatcarChannel := "stable" //TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
+
+	image, err := image.GetImageName(release, flatcarChannel)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	imagelist, err := imagelist.New(imagelist.Config{
+		Client:        r.Client,
+		ListName:      r.ImageListName,
+		ListNamespace: r.ImageListNamespace,
+		Log:           log,
+	}, ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Handle deleted release
+	if IsDeleted(release) {
+		if err := imagelist.RemoveImage(ctx, image); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// remove finalizer
+		if controllerutil.ContainsFinalizer(release, ReleaseControllerFinalizer) {
+			controllerutil.RemoveFinalizer(release, ReleaseControllerFinalizer)
+			if err := r.Update(ctx, release); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("Removed finalizer from release instance.")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// add finalizer
+	if !controllerutil.ContainsFinalizer(release, ReleaseControllerFinalizer) {
+		controllerutil.AddFinalizer(release, ReleaseControllerFinalizer)
+		if err := r.Update(ctx, release); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("Added finalizer to release instance.")
+	}
+
+	// Handle normal release
+	if err := imagelist.AddImage(ctx, image); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -55,8 +125,12 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReleaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
-		// For().
+		For(&v1alpha1.Release{}).
 		Named("release").
 		Complete(r)
+}
+
+// IsDeleted returns true if the release is marked for deletion.
+func IsDeleted(release *v1alpha1.Release) bool {
+	return !release.DeletionTimestamp.IsZero()
 }

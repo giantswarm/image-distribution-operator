@@ -5,6 +5,8 @@ go 1.23.0
 godebug default=go1.23
 
 require (
+	github.com/giantswarm/release-operator/v4 v4.2.0
+	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
 	k8s.io/apimachinery v0.32.0
@@ -26,7 +28,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/giantswarm/k8smetadata v0.24.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
