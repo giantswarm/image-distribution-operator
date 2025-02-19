@@ -48,7 +48,13 @@ func GetImageName(release *v1alpha1.Release, flatcarChannel string) (string, err
 
 // taken from github.com/giantswarm/capi-image-builder
 func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion string) string {
-	return fmt.Sprintf("flatcar-%s-%s-kube-%s-tooling-%s-gs", flatcarChannel, flatcarVersion, strings.TrimPrefix(kubernetesVersion, "v"), strings.TrimPrefix(toolingVersion, "v"))
+	return fmt.Sprintf(
+		"flatcar-%s-%s-kube-%s-tooling-%s-gs",
+		flatcarChannel,
+		flatcarVersion,
+		strings.TrimPrefix(kubernetesVersion, "v"),
+		strings.TrimPrefix(toolingVersion, "v"),
+	)
 }
 
 func getReleaseComponent(release *v1alpha1.Release, component string) (v1alpha1.ReleaseSpecComponent, error) {

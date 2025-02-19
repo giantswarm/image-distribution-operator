@@ -5,7 +5,9 @@
 domain: giantswarm.io
 layout:
 - go.kubebuilder.io/v4
-projectName: kubebuilder
+plugins:
+  helm.kubebuilder.io/v1-alpha: {}
+projectName: image-distribution-operator
 repo: giantswarm.io/image-distribution-operator
 resources:
 - controller: true

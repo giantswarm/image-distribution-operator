@@ -71,7 +71,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	flatcarChannel := "stable" //TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
+	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
 
 	image, err := image.GetImageName(release, flatcarChannel)
 	if err != nil {
