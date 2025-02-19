@@ -1,0 +1,10 @@
+apiVersion: vendir.k14s.io/v1alpha1
+kind: Config
+directories:
+  - path: helm
+    contents:
+    - path: image-distribution-operator
+      directory:
+        path: dist/chart/
+      ignorePaths:
+        - image-distribution-operator/values.schema.json
