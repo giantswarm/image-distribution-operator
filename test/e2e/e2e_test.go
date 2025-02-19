@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -42,8 +43,6 @@ const metricsServiceName = "image-distribution-operator-controller-manager-metri
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
 const metricsRoleBindingName = "image-distribution-operator-metrics-binding"
 
-const ReleaseCRDPath = "https://raw.githubusercontent.com/giantswarm/release-operator/refs/heads/master/config/crd/release.giantswarm.io_releases.yaml"
-
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
 
@@ -63,7 +62,7 @@ var _ = Describe("Manager", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
 
 		By("installing CRDs")
-		cmd = exec.Command("kubectl", "apply", "-f", ReleaseCRDPath)
+		cmd = exec.Command("kubectl", "apply", "-f", getReleaseCRDPath())
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
 
@@ -85,7 +84,7 @@ var _ = Describe("Manager", Ordered, func() {
 		_, _ = utils.Run(cmd)
 
 		By("uninstalling CRDs")
-		cmd = exec.Command("kubectl", "delete", "-f", ReleaseCRDPath)
+		cmd = exec.Command("kubectl", "delete", "-f", getReleaseCRDPath())
 		_, _ = utils.Run(cmd)
 
 		By("removing manager namespace")
@@ -333,4 +332,12 @@ type tokenRequest struct {
 	Status struct {
 		Token string `json:"token"`
 	} `json:"status"`
+}
+
+// getReleaseCRDPath returns the path to the CRD file for the release CR.
+func getReleaseCRDPath() string {
+	return strings.Join([]string{
+		"https://raw.githubusercontent.com/giantswarm/release-operator/",
+		"refs/heads/master/config/crd/release.giantswarm.io_releases.yaml",
+	}, "")
 }
