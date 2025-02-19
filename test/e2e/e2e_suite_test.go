@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"giantswarm.io/image-distribution-operator/test/utils"
+	"github.com/giantswarm/image-distribution-operator/test/utils"
 )
 
 var (

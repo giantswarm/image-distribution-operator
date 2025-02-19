@@ -37,7 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"giantswarm.io/image-distribution-operator/internal/controller"
+	"github.com/giantswarm/image-distribution-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

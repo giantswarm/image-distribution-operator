@@ -8,7 +8,7 @@ layout:
 plugins:
   helm.kubebuilder.io/v1-alpha: {}
 projectName: image-distribution-operator
-repo: giantswarm.io/image-distribution-operator
+repo: github.com/giantswarm/image-distribution-operator
 resources:
 - controller: true
   domain: giantswarm.io

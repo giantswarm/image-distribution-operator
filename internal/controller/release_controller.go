@@ -19,8 +19,8 @@ package controller
 import (
 	"context"
 
-	"giantswarm.io/image-distribution-operator/pkg/image"
-	"giantswarm.io/image-distribution-operator/pkg/imagelist"
+	"github.com/giantswarm/image-distribution-operator/pkg/image"
+	"github.com/giantswarm/image-distribution-operator/pkg/imagelist"
 
 	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
 	"github.com/go-logr/logr"
