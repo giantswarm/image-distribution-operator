@@ -3,13 +3,28 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@5.11.4
 
+jobs:
+  tests:
+    executor: architect/architect
+    steps:
+    - checkout
+    - run:
+        name: setup envtest
+        command: CGO_ENABLED=0 make setup-envtest
+
 workflows:
   test:
     jobs:
+      - tests:
+          filters:
+            tags:
+              only: /^v.*/
       - architect/go-build:
           context: architect
           name: go-build
           binary: template
+          requires:
+            - tests
           filters:
             # Trigger job also on git tag.
             tags:
