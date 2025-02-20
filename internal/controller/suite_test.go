@@ -22,9 +22,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/giantswarm/image-distribution-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/giantswarm/image-distribution-operator/test/utils"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
