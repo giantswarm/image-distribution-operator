@@ -58,8 +58,6 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	utils.GetEnvOrSkip("KUBEBUILDER_ASSETS")
-
 	var err error
 	// +kubebuilder:scaffold:scheme
 
@@ -68,6 +66,8 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: false,
 	}
+
+	utils.GetEnvOrSkip("KUBEBUILDER_ASSETS")
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
 	if getFirstFoundEnvTestBinaryDir() != "" {
