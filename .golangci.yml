@@ -1,11 +1,11 @@
 run:
   timeout: 5m
   allow-parallel-runners: true
-  skip-dirs:
-    - test
 
 
 issues:
+  exclude-dirs:
+    - test
   # don't skip warning about doc comments
   # don't exclude the default set of lint
   exclude-use-default: false
