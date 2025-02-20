@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,6 +56,8 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	ctx, cancel = context.WithCancel(context.TODO())
+
+	getEnvOrSkip("KUBEBUILDER_ASSETS")
 
 	var err error
 	// +kubebuilder:scaffold:scheme
@@ -108,4 +111,13 @@ func getFirstFoundEnvTestBinaryDir() string {
 		}
 	}
 	return ""
+}
+
+func getEnvOrSkip(env string) string {
+	value := os.Getenv(env)
+	if value == "" {
+		Skip(fmt.Sprintf("%s not exported", env))
+	}
+
+	return value
 }
