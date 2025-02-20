@@ -3,8 +3,8 @@ controllerManager:
   replicas: 1
   container:
     image:
-      repository: controller
-      tag: latest
+      repository: "gsoci.azurecr.io/giantswarm/image-distribution-operator"
+      tag: ""
     args:
       - "--leader-elect"
       - "--metrics-bind-address=:8443"
@@ -33,6 +33,7 @@ controllerManager:
       capabilities:
         drop:
           - "ALL"
+      readOnlyRootFilesystem: true
   securityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -48,7 +49,7 @@ rbac:
 crd:
   # This option determines whether the CRDs are included
   # in the installation process.
-  enable: true
+  enable: false
 
   # Enabling this option adds the "helm.sh/resource-policy": keep
   # annotation to the CRD, ensuring it remains installed even when

@@ -249,3 +249,12 @@ func UncommentCode(filename, target, prefix string) error {
 	// nolint:gosec
 	return os.WriteFile(filename, out.Bytes(), 0644)
 }
+
+func GetEnvOrSkip(env string) string {
+	value := os.Getenv(env)
+	if value == "" {
+		Skip(fmt.Sprintf("%s not exported", env))
+	}
+
+	return value
+}

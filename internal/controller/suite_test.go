@@ -18,11 +18,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/giantswarm/image-distribution-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -57,7 +57,7 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	getEnvOrSkip("KUBEBUILDER_ASSETS")
+	utils.GetEnvOrSkip("KUBEBUILDER_ASSETS")
 
 	var err error
 	// +kubebuilder:scaffold:scheme
@@ -111,13 +111,4 @@ func getFirstFoundEnvTestBinaryDir() string {
 		}
 	}
 	return ""
-}
-
-func getEnvOrSkip(env string) string {
-	value := os.Getenv(env)
-	if value == "" {
-		Skip(fmt.Sprintf("%s not exported", env))
-	}
-
-	return value
 }

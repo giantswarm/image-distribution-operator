@@ -8,4 +8,5 @@ directories:
         path: dist/chart/
       ignorePaths:
         - values.schema.json
+        - values.yaml
         - Chart.yaml

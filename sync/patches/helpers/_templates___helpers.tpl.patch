@@ -1,8 +1,25 @@
 diff --git a/helm/image-distribution-operator/templates/_helpers.tpl b/helm/image-distribution-operator/templates/_helpers.tpl
-index ab9bf4c..16a1c94 100644
+index ab9bf4c..7d1a914 100644
 --- a/helm/image-distribution-operator/templates/_helpers.tpl
 +++ b/helm/image-distribution-operator/templates/_helpers.tpl
-@@ -23,6 +23,7 @@ helm.sh/chart: {{ .Chart.Version | quote }}
+@@ -12,6 +12,16 @@
+ {{- end }}
+ {{- end }}
+ 
++{{/*
++Define image tag.
++*/}}
++{{- define "image.tag" -}}
++{{- if .Values.controllerManager.container.image.tag }}
++{{- .Values.controllerManager.container.image.tag }}
++{{- else }}
++{{- .Chart.AppVersion }}
++{{- end }}
++{{- end }}
+ 
+ {{- define "chart.labels" -}}
+ {{- if .Chart.AppVersion -}}
+@@ -23,6 +33,7 @@ helm.sh/chart: {{ .Chart.Version | quote }}
  app.kubernetes.io/name: {{ include "chart.name" . }}
  app.kubernetes.io/instance: {{ .Release.Name }}
  app.kubernetes.io/managed-by: {{ .Release.Service }}
