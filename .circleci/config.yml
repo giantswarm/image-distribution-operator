@@ -10,6 +10,7 @@ workflows:
           context: architect
           name: go-build
           binary: template
+          path: ./cmd
           filters:
             # Trigger job also on git tag.
             tags:
