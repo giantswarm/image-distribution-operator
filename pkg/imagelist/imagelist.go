@@ -92,7 +92,9 @@ func (i *ImageList) updateImageList(ctx context.Context) error {
 		}
 	}
 	// update the list of images inside the ImageList object
-	i.Images = object.Data
+	if object.Data != nil {
+		i.Images = object.Data
+	}
 	return nil
 }
 
