@@ -35,6 +35,7 @@ func New(c Config, ctx context.Context) (*ImageList, error) {
 		log:           c.Log,
 		ListName:      c.ListName,
 		ListNamespace: c.ListNamespace,
+		Images:        map[string]string{},
 	}
 
 	// sync the list of images with the configmap
