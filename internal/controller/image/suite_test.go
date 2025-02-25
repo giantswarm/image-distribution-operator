@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	"github.com/giantswarm/image-distribution-operator/test/utils"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -69,6 +70,8 @@ var _ = BeforeSuite(func() {
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
+
+	utils.GetEnvOrSkip("KUBEBUILDER_ASSETS")
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
 	if getFirstFoundEnvTestBinaryDir() != "" {
