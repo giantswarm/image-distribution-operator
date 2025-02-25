@@ -12,6 +12,16 @@
 {{- end }}
 {{- end }}
 
+{{/*
+Define image tag.
+*/}}
+{{- define "image.tag" -}}
+{{- if .Values.controllerManager.container.image.tag }}
+{{- .Values.controllerManager.container.image.tag }}
+{{- else }}
+{{- .Chart.AppVersion }}
+{{- end }}
+{{- end }}
 
 {{- define "chart.labels" -}}
 {{- if .Chart.AppVersion -}}
@@ -23,6 +33,7 @@ helm.sh/chart: {{ .Chart.Version | quote }}
 app.kubernetes.io/name: {{ include "chart.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | quote }}
 {{- end }}
 
 

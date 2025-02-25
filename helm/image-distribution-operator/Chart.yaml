@@ -4,4 +4,7 @@ description: A Helm chart to distribute the project image-distribution-operator
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-icon: "https://example.com/icon.png"
+icon: https://s.giantswarm.io/app-icons/giantswarm/1/light.svg
+
+annotations:
+  application.giantswarm.io/team: "rocket"

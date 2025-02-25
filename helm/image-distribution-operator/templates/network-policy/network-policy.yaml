@@ -1,0 +1,20 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: image-distribution-operator-network-policy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+  ingress:
+  - ports:
+    - port: 8080
+      protocol: TCP
+  egress:
+  - {}
+  policyTypes:
+  - Egress
+  - Ingress

@@ -1,8 +1,20 @@
 # image-distribution-operator
-// TODO(user): Add simple overview of use/purpose
+
+This operator runs on a kubernetes management cluster.
+Its purpose is to propagate node os images that are needed to create workload clusters to
+the workload clusters respective image catalog.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+The image-distribution-operator is made up of two controllers:
+
+### `release-controller`
+The `release-controller` watches release custom resources on the management cluster.
+It will generate the os image name from each release and keep track of the images that are needed to create workload clusters.
+The release-controller syncs the image names to a ConfigMap on the management cluster.
+
+### `image-controller`
+TODO
 
 ## Getting Started
 
@@ -11,6 +23,11 @@
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
+
+### Keeping the helm chart up to date
+The helm chart is generated using the kubebuilder plugin from the config directory.
+After making changes to `config`, run `sync/sync.sh` to update the helm chart.
+More information can be found in [this document](sync/README.md).
 
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**

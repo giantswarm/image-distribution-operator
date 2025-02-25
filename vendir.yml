@@ -7,4 +7,6 @@ directories:
       directory:
         path: dist/chart/
       ignorePaths:
-        - image-distribution-operator/values.schema.json
+        - values.schema.json
+        - values.yaml
+        - Chart.yaml
