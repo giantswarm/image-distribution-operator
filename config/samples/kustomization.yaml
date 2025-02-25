@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- image_v1alpha1_nodeimage.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

@@ -38,7 +38,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/giantswarm/image-distribution-operator/internal/controller"
+	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
+	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -51,6 +53,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
+	utilruntime.Must(imagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -205,7 +208,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.ReleaseReconciler{
+	if err = (&release.ReleaseReconciler{
 		ImageListName:      imageListName,
 		ImageListNamespace: imageListNamespace,
 		Log:                ctrl.Log.WithName("controllers").WithName("Release"),
@@ -213,6 +216,13 @@ func main() {
 		Scheme:             mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
+		os.Exit(1)
+	}
+	if err = (&imagecontroller.NodeImageReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
