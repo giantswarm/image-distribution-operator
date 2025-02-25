@@ -1,4 +1,5 @@
 {{- if .Values.rbac.enable }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -6,13 +7,54 @@ metadata:
     {{- include "chart.labels" . | nindent 4 }}
   name: image-distribution-operator-manager-role
 rules:
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch", "create", "update", "delete"]
-- apiGroups: ["release.giantswarm.io"]
-  resources: ["releases"]
-  verbs: ["get", "list", "watch", "update"]
+- apiGroups:
+  - image.giantswarm.io
+  resources:
+  - nodeimages
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - image.giantswarm.io
+  resources:
+  - nodeimages/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - image.giantswarm.io
+  resources:
+  - nodeimages/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - release.giantswarm.io.giantswarm.io
+  resources:
+  - releases
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - release.giantswarm.io.giantswarm.io
+  resources:
+  - releases/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - release.giantswarm.io.giantswarm.io
+  resources:
+  - releases/status
+  verbs:
+  - get
+  - patch
+  - update
 {{- end -}}

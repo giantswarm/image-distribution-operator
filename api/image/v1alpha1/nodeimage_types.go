@@ -28,14 +28,22 @@ type NodeImageSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of NodeImage. Edit nodeimage_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Name is the name of the image
+	Name string `json:"name"`
+	// Provider is the provider that the image is going to be used for
+	Provider string `json:"provider"`
 }
 
 // NodeImageStatus defines the observed state of NodeImage.
 type NodeImageStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Releases is the list of releases that the image is used in
+	Releases []string `json:"releases"`
+
+	// State is the state that the image is currently in
+	State string `json:"state"`
 }
 
 // +kubebuilder:object:root=true
