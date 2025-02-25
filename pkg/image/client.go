@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 )
 
 // Config is a struct that holds the configuration for the Client
