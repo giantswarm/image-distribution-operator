@@ -18,9 +18,9 @@ package release
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
-	"github.com/giantswarm/image-distribution-operator/pkg/imagelist"
 
 	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -38,10 +38,9 @@ const (
 // ReleaseReconciler reconciles a Release object
 type ReleaseReconciler struct {
 	client.Client
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	ImageListName      string
-	ImageListNamespace string
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Namespace string
 }
 
 // +kubebuilder:rbac:groups=release.giantswarm.io.giantswarm.io,resources=releases,verbs=get;list;watch;create;update;patch;delete
@@ -73,24 +72,25 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
 
-	image, err := image.GetImageName(release, flatcarChannel)
+	nodeImage, err := image.GetNodeImage(release, flatcarChannel)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	imagelist, err := imagelist.New(imagelist.Config{
-		Client:        r.Client,
-		ListName:      r.ImageListName,
-		ListNamespace: r.ImageListNamespace,
-		Log:           log,
-	}, ctx)
+	imageClient, err := image.New(image.Config{
+		Client:    r.Client,
+		Namespace: r.Namespace,
+		Log:       log,
+		Release:   release.Name,
+	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Handle deleted release
 	if IsDeleted(release) {
-		if err := imagelist.RemoveImage(ctx, image); err != nil {
+		log.Info(fmt.Sprintf("Release %s is marked for deletion.", release.Name))
+		if err := imageClient.RemoveImage(ctx, nodeImage); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -115,7 +115,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Handle normal release
-	if err := imagelist.AddImage(ctx, image); err != nil {
+	if err := imageClient.CreateOrUpdateImage(ctx, nodeImage); err != nil {
 		return ctrl.Result{}, err
 	}
 

@@ -4,10 +4,26 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	images "github.com/giantswarm/image-distribution-operator/api/v1alpha1"
+
+	releases "github.com/giantswarm/release-operator/v4/api/v1alpha1"
 )
 
-func GetImageName(release *v1alpha1.Release, flatcarChannel string) (string, error) {
+func GetNodeImage(release *releases.Release, flatcarChannel string) (images.NodeImage, error) {
+	imageName, err := GetImageName(release, flatcarChannel)
+	if err != nil {
+		return images.NodeImage{}, err
+	}
+
+	return images.NodeImage{
+		Spec: images.NodeImageSpec{
+			Name:     imageName,
+			Provider: "aws",
+		},
+	}, nil
+}
+
+func GetImageName(release *releases.Release, flatcarChannel string) (string, error) {
 
 	var flatcarVersion, kubernetesVersion, toolingVersion string
 	{
@@ -46,6 +62,12 @@ func GetImageName(release *v1alpha1.Release, flatcarChannel string) (string, err
 	return buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion), nil
 }
 
+func getImageProvider(release string) string {
+	// the provider name is the first part of the name before the first digit
+	// TODO regex
+	return ""
+}
+
 // taken from github.com/giantswarm/capi-image-builder
 func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion string) string {
 	return fmt.Sprintf(
@@ -57,7 +79,7 @@ func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVe
 	)
 }
 
-func getReleaseComponent(release *v1alpha1.Release, component string) (v1alpha1.ReleaseSpecComponent, error) {
+func getReleaseComponent(release *releases.Release, component string) (releases.ReleaseSpecComponent, error) {
 	components := release.Spec.Components
 
 	for _, c := range components {
@@ -66,5 +88,5 @@ func getReleaseComponent(release *v1alpha1.Release, component string) (v1alpha1.
 		}
 	}
 
-	return v1alpha1.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
+	return releases.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
 }
