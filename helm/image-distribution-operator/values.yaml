@@ -49,7 +49,7 @@ rbac:
 crd:
   # This option determines whether the CRDs are included
   # in the installation process.
-  enable: false
+  enable: true
 
   # Enabling this option adds the "helm.sh/resource-policy": keep
   # annotation to the CRD, ensuring it remains installed even when

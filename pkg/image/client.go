@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	images "github.com/giantswarm/image-distribution-operator/api/v1alpha1"
+	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,12 +90,12 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 		if apierrors.IsNotFound(err) {
 			// Create the Image if it does not exist yet
 			i.log.Info(fmt.Sprintf("Creating node image %s", object.Name))
-			return i.Create(ctx, &image)
+			return i.Create(ctx, image)
 		}
 		return err
 	}
 	// Check node image status
-	for index, release := range object.Status.Releases {
+	for _, release := range object.Status.Releases {
 		if release == i.Release {
 			// release is already listed
 			return nil

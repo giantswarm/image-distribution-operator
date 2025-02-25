@@ -2,28 +2,50 @@ package image
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
-	images "github.com/giantswarm/image-distribution-operator/api/v1alpha1"
+	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 
 	releases "github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetNodeImage(release *releases.Release, flatcarChannel string) (images.NodeImage, error) {
-	imageName, err := GetImageName(release, flatcarChannel)
+func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (*images.NodeImage, error) {
+	imageName, err := getImageName(release, flatcarChannel)
 	if err != nil {
-		return images.NodeImage{}, err
+		return &images.NodeImage{}, err
 	}
 
-	return images.NodeImage{
-		Spec: images.NodeImageSpec{
-			Name:     imageName,
-			Provider: "aws",
-		},
-	}, nil
+	providerName, err := getImageProvider(release.Name)
+	if err != nil {
+		return &images.NodeImage{}, err
+	}
+
+	return GetNodeImage(imageName, providerName, release.Name), nil
 }
 
-func GetImageName(release *releases.Release, flatcarChannel string) (string, error) {
+func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage {
+	return &images.NodeImage{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "image.giantswarm.io/v1alpha1",
+			Kind:       "NodeImage",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: strings.Join([]string{providerName, imageName}, "-"),
+		},
+
+		Spec: images.NodeImageSpec{
+			Name:     imageName,
+			Provider: providerName,
+		},
+		Status: images.NodeImageStatus{
+			Releases: []string{releaseName},
+		},
+	}
+}
+
+func getImageName(release *releases.Release, flatcarChannel string) (string, error) {
 
 	var flatcarVersion, kubernetesVersion, toolingVersion string
 	{
@@ -62,10 +84,14 @@ func GetImageName(release *releases.Release, flatcarChannel string) (string, err
 	return buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion), nil
 }
 
-func getImageProvider(release string) string {
+func getImageProvider(release string) (string, error) {
 	// the provider name is the first part of the name before the first digit
-	// TODO regex
-	return ""
+	regexp := regexp.MustCompile(`^([a-z-]+)-\d+\.\d+\.\d+`)
+	matches := regexp.FindStringSubmatch(release)
+	if len(matches) > 1 {
+		return matches[1], nil
+	}
+	return "", fmt.Errorf("provider name not found in release %s", release)
 }
 
 // taken from github.com/giantswarm/capi-image-builder

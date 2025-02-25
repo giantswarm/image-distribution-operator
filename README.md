@@ -11,7 +11,10 @@ The image-distribution-operator is made up of two controllers:
 ### `release-controller`
 The `release-controller` watches release custom resources on the management cluster.
 It will generate the os image name from each release and keep track of the images that are needed to create workload clusters.
-The release-controller syncs the image names to a ConfigMap on the management cluster.
+For each image that is needed, it will create a `NodeImage` custom resource.
+The list of releases using the image is stored in the `NodeImage` Status.
+If a release is deleted, the `NodeImage` Status is updated to remove the release from the list.
+If a `NodeImage` is no longer needed, it is deleted.
 
 ### `image-controller`
 TODO

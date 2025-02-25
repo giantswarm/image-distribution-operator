@@ -72,7 +72,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
 
-	nodeImage, err := image.GetNodeImage(release, flatcarChannel)
+	nodeImage, err := image.GetNodeImageFromRelease(release, flatcarChannel)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -90,7 +90,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Handle deleted release
 	if IsDeleted(release) {
 		log.Info(fmt.Sprintf("Release %s is marked for deletion.", release.Name))
-		if err := imageClient.RemoveImage(ctx, nodeImage); err != nil {
+		if err := imageClient.RemoveImage(ctx, nodeImage.Name); err != nil {
 			return ctrl.Result{}, err
 		}
 
