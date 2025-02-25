@@ -1,0 +1,9 @@
+apiVersion: image.giantswarm.io/v1alpha1
+kind: NodeImage
+metadata:
+  labels:
+    app.kubernetes.io/name: image-distribution-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: nodeimage-sample
+spec:
+  # TODO(user): Add fields here

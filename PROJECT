@@ -5,6 +5,7 @@
 domain: giantswarm.io
 layout:
 - go.kubebuilder.io/v4
+multigroup: true
 plugins:
   helm.kubebuilder.io/v1-alpha: {}
 projectName: image-distribution-operator
@@ -14,5 +15,14 @@ resources:
   domain: giantswarm.io
   group: release.giantswarm.io
   kind: Release
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: giantswarm.io
+  group: image
+  kind: NodeImage
+  path: github.com/giantswarm/image-distribution-operator/api/image/v1alpha1
   version: v1alpha1
 version: "3"

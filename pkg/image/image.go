@@ -2,12 +2,50 @@ package image
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
-	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+
+	releases "github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetImageName(release *v1alpha1.Release, flatcarChannel string) (string, error) {
+func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (*images.NodeImage, error) {
+	imageName, err := getImageName(release, flatcarChannel)
+	if err != nil {
+		return &images.NodeImage{}, err
+	}
+
+	providerName, err := getImageProvider(release.Name)
+	if err != nil {
+		return &images.NodeImage{}, err
+	}
+
+	return GetNodeImage(imageName, providerName, release.Name), nil
+}
+
+func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage {
+	return &images.NodeImage{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "image.giantswarm.io/v1alpha1",
+			Kind:       "NodeImage",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: strings.Join([]string{providerName, imageName}, "-"),
+		},
+
+		Spec: images.NodeImageSpec{
+			Name:     imageName,
+			Provider: providerName,
+		},
+		Status: images.NodeImageStatus{
+			Releases: []string{releaseName},
+		},
+	}
+}
+
+func getImageName(release *releases.Release, flatcarChannel string) (string, error) {
 
 	var flatcarVersion, kubernetesVersion, toolingVersion string
 	{
@@ -46,6 +84,16 @@ func GetImageName(release *v1alpha1.Release, flatcarChannel string) (string, err
 	return buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion), nil
 }
 
+func getImageProvider(release string) (string, error) {
+	// the provider name is the first part of the name before the first digit
+	regexp := regexp.MustCompile(`^([a-z-]+)-\d+\.\d+\.\d+`)
+	matches := regexp.FindStringSubmatch(release)
+	if len(matches) > 1 {
+		return matches[1], nil
+	}
+	return "", fmt.Errorf("provider name not found in release %s", release)
+}
+
 // taken from github.com/giantswarm/capi-image-builder
 func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion string) string {
 	return fmt.Sprintf(
@@ -57,7 +105,7 @@ func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVe
 	)
 }
 
-func getReleaseComponent(release *v1alpha1.Release, component string) (v1alpha1.ReleaseSpecComponent, error) {
+func getReleaseComponent(release *releases.Release, component string) (releases.ReleaseSpecComponent, error) {
 	components := release.Spec.Components
 
 	for _, c := range components {
@@ -66,5 +114,5 @@ func getReleaseComponent(release *v1alpha1.Release, component string) (v1alpha1.
 		}
 	}
 
-	return v1alpha1.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
+	return releases.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
 }

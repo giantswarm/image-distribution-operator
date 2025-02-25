@@ -38,7 +38,9 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/giantswarm/image-distribution-operator/internal/controller"
+	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
+	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -51,12 +53,13 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 
+	utilruntime.Must(imagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
 // nolint:gocyclo
 func main() {
-	var imageListName, imageListNamespace string
+	var namespace string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -65,8 +68,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
-	flag.StringVar(&imageListName, "image-list-name", "image-list", "The name of the ImageList object.")
-	flag.StringVar(&imageListNamespace, "image-list-namespace", "default", "The namespace of the ImageList object.")
+	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -205,14 +207,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.ReleaseReconciler{
-		ImageListName:      imageListName,
-		ImageListNamespace: imageListNamespace,
-		Log:                ctrl.Log.WithName("controllers").WithName("Release"),
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
+	if err = (&release.ReleaseReconciler{
+		Namespace: namespace,
+		Log:       ctrl.Log.WithName("controllers").WithName("Release"),
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
+		os.Exit(1)
+	}
+	if err = (&imagecontroller.NodeImageReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
