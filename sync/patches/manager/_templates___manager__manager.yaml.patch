@@ -1,5 +1,5 @@
 diff --git a/helm/image-distribution-operator/templates/manager/manager.yaml b/helm/image-distribution-operator/templates/manager/manager.yaml
-index 7d52cb5..eefd77b 100644
+index 7d52cb5..afc7508 100644
 --- a/helm/image-distribution-operator/templates/manager/manager.yaml
 +++ b/helm/image-distribution-operator/templates/manager/manager.yaml
 @@ -33,7 +33,11 @@ spec:
@@ -15,3 +15,21 @@ index 7d52cb5..eefd77b 100644
            {{- if .Values.controllerManager.container.env }}
            env:
              {{- range $key, $value := .Values.controllerManager.container.env }}
+@@ -51,6 +55,8 @@ spec:
+             {{- toYaml .Values.controllerManager.container.securityContext | nindent 12 }}
+           {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
+           volumeMounts:
++            - mountPath: /tmp/images
++              name: image-storage
+             {{- if and .Values.metrics.enable .Values.certmanager.enable }}
+             - name: metrics-certs
+               mountPath: /tmp/k8s-metrics-server/metrics-certs
+@@ -63,6 +69,8 @@ spec:
+       terminationGracePeriodSeconds: {{ .Values.controllerManager.terminationGracePeriodSeconds }}
+       {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
+       volumes:
++        - name: image-storage
++          emptyDir: {}
+         {{- if and .Values.metrics.enable .Values.certmanager.enable }}
+         - name: metrics-certs
+           secret:
