@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	"github.com/giantswarm/image-distribution-operator/pkg/image/s3"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,8 +38,9 @@ const (
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	S3Client *s3.Client
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -67,8 +69,6 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// TODO create client(s)
-
 	// Handle deletion
 	if IsDeleted(nodeImage) {
 		log.Info(fmt.Sprintf("NodeImage %s is marked for deletion", nodeImage.Name))
@@ -94,7 +94,16 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Info(fmt.Sprintf("Finalizer %s added to NodeImage %s", NodeImageFinalizer, nodeImage.Name))
 	}
 
-	// TODO handle create/update
+	// TODO check if the image is present before downloading it
+
+	// pulling the image from aws s3
+	imagePath, err := r.S3Client.Pull(ctx, nodeImage.Name) // TODO are we sure that image key is image name?
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err // Retry on failure
+	}
+
+	log.Info(fmt.Sprintf("Completed download of image %s to %s", nodeImage.Name, imagePath))
+	// TODO pushing the image
 
 	return ctrl.Result{}, nil
 }
