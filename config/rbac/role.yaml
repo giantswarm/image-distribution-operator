@@ -35,8 +35,6 @@ rules:
   resources:
   - releases
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
