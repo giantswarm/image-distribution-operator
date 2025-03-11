@@ -11,3 +11,4 @@ directories:
         - values.yaml
         - Chart.yaml
         - templates/manager/manager.yaml
+        - templates/network-policy/network-policy.yaml
