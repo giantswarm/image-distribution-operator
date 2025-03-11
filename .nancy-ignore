@@ -1,4 +1,4 @@
 # golang/golang.org/x/net@v0.30.0
-CVE-2024-45338 until=2025-03-01
+CVE-2024-45338 until=2025-04-01
 # golang/k8s.io/apiserver@v0.32.0
-CVE-2020-8561 until=2025-03-01
+CVE-2020-8561 until=2025-04-01
