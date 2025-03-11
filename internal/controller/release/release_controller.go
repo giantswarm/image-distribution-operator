@@ -43,9 +43,9 @@ type ReleaseReconciler struct {
 	Namespace string
 }
 
-// +kubebuilder:rbac:groups=release.giantswarm.io.giantswarm.io,resources=releases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=release.giantswarm.io.giantswarm.io,resources=releases/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=release.giantswarm.io.giantswarm.io,resources=releases/finalizers,verbs=update
+// +kubebuilder:rbac:groups=release.giantswarm.io,resources=releases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=release.giantswarm.io,resources=releases/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=release.giantswarm.io,resources=releases/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

@@ -34,23 +34,25 @@ rules:
   - patch
   - update
 - apiGroups:
-  - release.giantswarm.io.giantswarm.io
+  - release.giantswarm.io
   resources:
   - releases
   verbs:
+  - create
+  - delete
   - get
   - list
   - patch
   - update
   - watch
 - apiGroups:
-  - release.giantswarm.io.giantswarm.io
+  - release.giantswarm.io
   resources:
   - releases/finalizers
   verbs:
   - update
 - apiGroups:
-  - release.giantswarm.io.giantswarm.io
+  - release.giantswarm.io
   resources:
   - releases/status
   verbs:

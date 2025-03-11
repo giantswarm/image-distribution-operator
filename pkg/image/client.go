@@ -91,6 +91,7 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 		if apierrors.IsNotFound(err) {
 			// Create the Image if it does not exist yet
 			i.log.Info(fmt.Sprintf("Creating node image %s", object.Name))
+			image.Namespace = i.Namespace
 			return i.Create(ctx, image)
 		}
 		return err
