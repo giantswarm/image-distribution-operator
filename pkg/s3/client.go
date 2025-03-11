@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,6 +29,10 @@ type Config struct {
 	Directory  string
 	Timeout    time.Duration
 }
+
+const (
+	SafeDir = "/tmp"
+)
 
 // New initializes a new S3 client
 func New(c Config, ctx context.Context) (*Client, error) {
@@ -61,20 +66,33 @@ func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (st
 	if err != nil {
 		return "", fmt.Errorf("failed to pull image %s from S3 bucket %s.\n%w", imageKey, c.bucketName, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error(err, "failed to close S3 response body")
+		}
+	}()
 
 	// Ensure local directory exists
-	if err := os.MkdirAll(c.directory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(c.directory, 0700); err != nil {
 		return "", fmt.Errorf("failed to ensure local directory %s.\n%w", c.directory, err)
 	}
 
 	// Define local file path
 	localFilePath := filepath.Join(c.directory, filepath.Base(imageKey))
+
+	if !strings.HasPrefix(localFilePath, SafeDir) {
+		return "", fmt.Errorf("unsafe file path detected: %s", localFilePath)
+	}
+
 	file, err := os.Create(localFilePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create local file %s.\n%w", localFilePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Error(err, "failed to close local file")
+		}
+	}()
 
 	// Stream data from S3 to file
 	_, err = io.Copy(file, resp.Body)
