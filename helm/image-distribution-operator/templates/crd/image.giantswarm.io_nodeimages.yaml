@@ -72,6 +72,8 @@ spec:
             - releases
             - state
             type: object
+        required:
+        - status
         type: object
     served: true
     storage: true

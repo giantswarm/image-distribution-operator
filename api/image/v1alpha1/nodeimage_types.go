@@ -55,7 +55,7 @@ type NodeImage struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   NodeImageSpec   `json:"spec,omitempty"`
-	Status NodeImageStatus `json:"status,omitempty"`
+	Status NodeImageStatus `json:"status"`
 }
 
 // +kubebuilder:object:root=true
