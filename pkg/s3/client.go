@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,19 +18,17 @@ import (
 type Client struct {
 	s3         s3.Client
 	bucketName string
-	directory  string
 	timeout    time.Duration
 }
 
 type Config struct {
 	BucketName string
 	Region     string
-	Directory  string
 	Timeout    time.Duration
 }
 
 const (
-	SafeDir = "/tmp/images"
+	Directory = "/tmp/images"
 )
 
 // New initializes a new S3 client
@@ -45,7 +42,6 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	return &Client{
 		s3:         *client,
 		bucketName: c.BucketName,
-		directory:  c.Directory,
 		timeout:    c.Timeout,
 	}, nil
 }
@@ -73,16 +69,12 @@ func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (st
 	}()
 
 	// Ensure local directory exists
-	if err := os.MkdirAll(c.directory, 0700); err != nil {
-		return "", fmt.Errorf("failed to ensure local directory %s.\n%w", c.directory, err)
+	if err := os.MkdirAll(Directory, 0700); err != nil {
+		return "", fmt.Errorf("failed to ensure local directory %s.\n%w", Directory, err)
 	}
 
 	// Define local file path
-	localFilePath := filepath.Join(c.directory, filepath.Base(imageKey))
-
-	if !strings.HasPrefix(localFilePath, SafeDir) {
-		return "", fmt.Errorf("unsafe file path detected: %s", localFilePath)
-	}
+	localFilePath := filepath.Join(Directory, filepath.Base(imageKey))
 
 	file, err := os.Create(localFilePath)
 	if err != nil {

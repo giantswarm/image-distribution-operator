@@ -73,12 +73,10 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 	var s3Bucket, s3Region string
 	var s3TimeoutSeconds int
-	var imageDirectory string
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
-	flag.StringVar(&imageDirectory, "image-directory", "/tmp/images", "The local directory where images are stored.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -220,7 +218,6 @@ func main() {
 	s3Client, err := s3.New(s3.Config{
 		BucketName: s3Bucket,
 		Region:     s3Region,
-		Directory:  imageDirectory,
 		Timeout:    time.Duration(s3TimeoutSeconds) * time.Second,
 	}, context.Background())
 	if err != nil {
