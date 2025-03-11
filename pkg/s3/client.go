@@ -17,14 +17,12 @@ import (
 // S3Client wraps the AWS SDK client
 type Client struct {
 	s3         s3.Client
-	log        logr.Logger
 	bucketName string
 	directory  string
 	timeout    time.Duration
 }
 
 type Config struct {
-	Log        logr.Logger
 	BucketName string
 	Region     string
 	Directory  string
@@ -41,15 +39,15 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	client := s3.NewFromConfig(cfg)
 	return &Client{
 		s3:         *client,
-		log:        c.Log,
 		bucketName: c.BucketName,
 		directory:  c.Directory,
+		timeout:    c.Timeout,
 	}, nil
 }
 
 // Pull fetches an image from S3 and stores it locally
-func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
-	c.log.Info(fmt.Sprintf("Starting to pull image %s from S3 bucket %s", imageKey, c.bucketName))
+func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (string, error) {
+	log.Info(fmt.Sprintf("Starting to pull image %s from S3 bucket %s", imageKey, c.bucketName))
 
 	// Set timeout
 	childCtx, cancel := context.WithTimeout(ctx, c.timeout)
@@ -84,6 +82,6 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 		return "", fmt.Errorf("failed to write S3 object to file%s.\n%w", localFilePath, err)
 	}
 
-	c.log.Info(fmt.Sprintf("Completed download of image %s to local path %s", imageKey, localFilePath))
+	log.Info(fmt.Sprintf("Completed download of image %s to local path %s", imageKey, localFilePath))
 	return localFilePath, nil
 }

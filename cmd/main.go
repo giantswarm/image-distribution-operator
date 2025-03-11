@@ -17,10 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
 	"path/filepath"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -41,6 +43,7 @@ import (
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
 	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
+	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -68,7 +71,14 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var s3Bucket, s3Region string
+	var s3TimeoutSeconds int
+	var imageDirectory string
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
+	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
+	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
+	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
+	flag.StringVar(&imageDirectory, "image-directory", "/tmp/images", "The local directory where images are stored.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -207,6 +217,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	s3Client, err := s3.New(s3.Config{
+		BucketName: s3Bucket,
+		Region:     s3Region,
+		Directory:  imageDirectory,
+		Timeout:    time.Duration(s3TimeoutSeconds) * time.Second,
+	}, context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to create S3 client")
+		os.Exit(1)
+	}
+
 	if err = (&release.ReleaseReconciler{
 		Namespace: namespace,
 		Log:       ctrl.Log.WithName("controllers").WithName("Release"),
@@ -217,8 +238,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Log:      ctrl.Log.WithName("controllers").WithName("NodeImage"),
+		S3Client: s3Client,
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

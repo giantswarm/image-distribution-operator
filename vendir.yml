@@ -10,3 +10,4 @@ directories:
         - values.schema.json
         - values.yaml
         - Chart.yaml
+        - templates/manager/manager.yaml
