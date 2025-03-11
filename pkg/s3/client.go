@@ -31,7 +31,7 @@ type Config struct {
 }
 
 const (
-	SafeDir = "/tmp"
+	SafeDir = "/tmp/images"
 )
 
 // New initializes a new S3 client
