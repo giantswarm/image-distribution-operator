@@ -107,5 +107,5 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
 	i.log.Info(fmt.Sprintf("Adding release %s to the status of node image %s", i.Release, object.Name))
-	return i.Client.Update(ctx, object)
+	return i.Client.Status().Update(ctx, object)
 }
