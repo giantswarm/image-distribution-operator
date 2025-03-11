@@ -69,7 +69,7 @@ func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (st
 	}()
 
 	// Ensure local directory exists
-	if err := os.MkdirAll(Directory, 0700); err != nil {
+	if err := os.MkdirAll("/tmp/images", 0700); err != nil {
 		return "", fmt.Errorf("failed to ensure local directory %s.\n%w", Directory, err)
 	}
 
