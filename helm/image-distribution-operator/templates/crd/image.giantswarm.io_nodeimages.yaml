@@ -68,9 +68,6 @@ spec:
               state:
                 description: State is the state that the image is currently in
                 type: string
-            required:
-            - releases
-            - state
             type: object
         required:
         - status

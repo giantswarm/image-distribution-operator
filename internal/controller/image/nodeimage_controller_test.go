@@ -51,10 +51,7 @@ var _ = Describe("NodeImage Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					Status: imagev1alpha1.NodeImageStatus{
-						State:    "",
-						Releases: []string{},
-					},
+					Status: imagev1alpha1.NodeImageStatus{},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

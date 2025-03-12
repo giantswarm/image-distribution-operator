@@ -40,10 +40,10 @@ type NodeImageStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Releases is the list of releases that the image is used in
-	Releases []string `json:"releases"`
+	Releases []string `json:"releases,omitempty"`
 
 	// State is the state that the image is currently in
-	State string `json:"state"`
+	State string `json:"state,omitempty"`
 }
 
 // +kubebuilder:object:root=true
