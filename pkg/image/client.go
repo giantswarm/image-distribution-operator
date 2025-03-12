@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 )
@@ -15,14 +15,12 @@ import (
 type Config struct {
 	Client    client.Client
 	Namespace string
-	Log       logr.Logger
 	Release   string
 }
 
 // Client holds the client and the namespace for node image objects
 type Client struct {
 	client.Client
-	log       logr.Logger
 	Namespace string
 	Release   string
 }
@@ -42,7 +40,6 @@ func New(c Config) (*Client, error) {
 	// create a new ImageList object
 	client := &Client{
 		Client:    c.Client,
-		log:       c.Log,
 		Namespace: c.Namespace,
 		Release:   c.Release,
 	}
@@ -51,6 +48,8 @@ func New(c Config) (*Client, error) {
 }
 
 func (i *Client) RemoveImage(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
 	// Get Image Object
 	object := &images.NodeImage{}
 	if err := i.Client.Get(ctx, client.ObjectKey{
@@ -72,16 +71,18 @@ func (i *Client) RemoveImage(ctx context.Context, image string) error {
 	}
 	// If there are still releases in the list, update the object
 	if len(object.Status.Releases) > 0 {
-		i.log.Info(fmt.Sprintf("Removing release %s from status of node image %s", i.Release, object.Name))
+		log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
 		return i.Client.Update(ctx, object)
 	}
 
 	// If there are no releases left, delete the object
-	i.log.Info(fmt.Sprintf("Deleting node image %s", object.Name))
+	log.Info("Deleting node image", "nodeImage", object.Name)
 	return i.Client.Delete(ctx, object)
 }
 
 func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImage) error {
+	log := log.FromContext(ctx)
+
 	// Get Image Object
 	object := &images.NodeImage{}
 	if err := i.Client.Get(ctx, client.ObjectKey{
@@ -90,7 +91,7 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 	}, object); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Create the Image if it does not exist yet
-			i.log.Info(fmt.Sprintf("Creating node image %s", object.Name))
+			log.Info("Creating node image object", "nodeImage", image.Name)
 			image.Namespace = i.Namespace
 			return i.Create(ctx, image)
 		}
@@ -106,6 +107,6 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
-	i.log.Info(fmt.Sprintf("Adding release %s to the status of node image %s", i.Release, object.Name))
+	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
 	return i.Client.Status().Update(ctx, object)
 }

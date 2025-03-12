@@ -18,17 +18,16 @@ package release
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
 
 	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
-	"github.com/go-logr/logr"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -38,8 +37,6 @@ const (
 // ReleaseReconciler reconciles a Release object
 type ReleaseReconciler struct {
 	client.Client
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
 	Namespace string
 }
 
@@ -57,17 +54,13 @@ type ReleaseReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("release", req.NamespacedName)
+	log := log.FromContext(ctx)
 
 	// Fetch the Release
 	release := &v1alpha1.Release{}
-	if err := r.Get(ctx, req.NamespacedName, release); err != nil {
-		if apierrors.IsNotFound(err) {
-			// Object not found. Return
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		return ctrl.Result{}, err
+	err := r.Get(ctx, req.NamespacedName, release)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
@@ -80,7 +73,6 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	imageClient, err := image.New(image.Config{
 		Client:    r.Client,
 		Namespace: r.Namespace,
-		Log:       log,
 		Release:   release.Name,
 	})
 	if err != nil {
@@ -89,7 +81,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Handle deleted release
 	if IsDeleted(release) {
-		log.Info(fmt.Sprintf("Release %s is marked for deletion.", release.Name))
+		log.Info("Release is being deleted", "release", release.Name)
 		if err := imageClient.RemoveImage(ctx, nodeImage.Name); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -100,7 +92,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Update(ctx, release); err != nil {
 				return ctrl.Result{}, err
 			}
-			log.Info("Removed finalizer from release instance.")
+			log.Info("Finalizer removed from Release", "finalizer", ReleaseControllerFinalizer, "release", release.Name)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -111,7 +103,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err := r.Update(ctx, release); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info("Added finalizer to release instance.")
+		log.Info("Finalizer added to Release", "finalizer", ReleaseControllerFinalizer, "release", release.Name)
 	}
 
 	// Handle normal release
@@ -119,7 +111,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return DefaultRequeue(), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -133,4 +125,11 @@ func (r *ReleaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // IsDeleted returns true if the release is marked for deletion.
 func IsDeleted(release *v1alpha1.Release) bool {
 	return !release.DeletionTimestamp.IsZero()
+}
+
+func DefaultRequeue() reconcile.Result {
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: time.Minute * 5,
+	}
 }

@@ -227,18 +227,14 @@ func main() {
 
 	if err = (&release.ReleaseReconciler{
 		Namespace: namespace,
-		Log:       ctrl.Log.WithName("controllers").WithName("Release"),
 		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		Log:      ctrl.Log.WithName("controllers").WithName("NodeImage"),
 		S3Client: s3Client,
 		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

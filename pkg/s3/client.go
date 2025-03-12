@@ -48,7 +48,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 // Pull fetches an image from S3 and stores it locally
 func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (string, error) {
-	log.Info(fmt.Sprintf("Starting to pull image %s from S3 bucket %s", imageKey, c.bucketName))
+	log.Info("Starting to pull image from S3", "imageKey", imageKey, "bucketName", c.bucketName)
 
 	// Set timeout
 	childCtx, cancel := context.WithTimeout(ctx, c.timeout)
@@ -92,6 +92,6 @@ func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (st
 		return "", fmt.Errorf("failed to write S3 object to file%s.\n%w", localFilePath, err)
 	}
 
-	log.Info(fmt.Sprintf("Completed download of image %s to local path %s", imageKey, localFilePath))
+	log.Info("Completed download of image from S3", "imageKey", imageKey, "localFilePath", localFilePath)
 	return localFilePath, nil
 }

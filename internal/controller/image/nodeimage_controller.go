@@ -18,17 +18,14 @@ package image
 
 import (
 	"context"
-	"fmt"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 
-	"github.com/go-logr/logr"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -39,8 +36,6 @@ const (
 type NodeImageReconciler struct {
 	client.Client
 	S3Client *s3.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -57,21 +52,18 @@ type NodeImageReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("nodeImage", req.NamespacedName)
+	log := log.FromContext(ctx)
 
 	// Fetch the NodeImage instance
 	nodeImage := &imagev1alpha1.NodeImage{}
 	err := r.Get(ctx, req.NamespacedName, nodeImage)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Handle deletion
 	if IsDeleted(nodeImage) {
-		log.Info(fmt.Sprintf("NodeImage %s is marked for deletion", nodeImage.Name))
+		log.Info("NodeImage is being deleted", "nodeImage", nodeImage.Name)
 		// TODO handle deletion
 
 		// Remove finalizer
@@ -80,7 +72,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			if err := r.Update(ctx, nodeImage); err != nil {
 				return ctrl.Result{}, err
 			}
-			log.Info(fmt.Sprintf("Finalizer %s removed from NodeImage %s", NodeImageFinalizer, nodeImage.Name))
+			log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -91,7 +83,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err := r.Update(ctx, nodeImage); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info(fmt.Sprintf("Finalizer %s added to NodeImage %s", NodeImageFinalizer, nodeImage.Name))
+		log.Info("Finalizer added to NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
 	}
 
 	// TODO handle create/update

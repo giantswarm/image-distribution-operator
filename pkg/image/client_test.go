@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,7 +75,6 @@ func TestRemoveImage(t *testing.T) {
 			c, err := New(Config{
 				Client:    fakeClient,
 				Namespace: "test-namespace",
-				Log:       logr.Discard(),
 				Release:   tc.release,
 			})
 			assert.NoError(t, err)
@@ -168,7 +166,6 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			c, err := New(Config{
 				Client:    fakeClient,
 				Namespace: "test-namespace",
-				Log:       logr.Discard(),
 				Release:   tc.release,
 			})
 			assert.NoError(t, err)
