@@ -47,7 +47,7 @@ func New(c Config) (*Client, error) {
 	return client, nil
 }
 
-func (i *Client) RemoveImage(ctx context.Context, image string) error {
+func (i *Client) RemoveRelease(ctx context.Context, image string) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object
@@ -69,10 +69,29 @@ func (i *Client) RemoveImage(ctx context.Context, image string) error {
 			break
 		}
 	}
-	// If there are still releases in the list, update the object
+	// Update the object
+	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
+	return i.Client.Update(ctx, object)
+}
+
+func (i *Client) DeleteImage(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
+	// Get Image Object
+	object := &images.NodeImage{}
+	if err := i.Client.Get(ctx, client.ObjectKey{
+		Namespace: i.Namespace,
+		Name:      image,
+	}, object); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	// If there are still releases in the list, nothing to do
 	if len(object.Status.Releases) > 0 {
-		log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
-		return i.Client.Update(ctx, object)
+		return nil
 	}
 
 	// If there are no releases left, delete the object
@@ -80,7 +99,7 @@ func (i *Client) RemoveImage(ctx context.Context, image string) error {
 	return i.Client.Delete(ctx, object)
 }
 
-func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImage) error {
+func (i *Client) CreateImage(ctx context.Context, image *images.NodeImage) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object
@@ -97,6 +116,21 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 		}
 		return err
 	}
+	return nil
+}
+
+func (i *Client) AddRelease(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
+	// Get Image Object
+	object := &images.NodeImage{}
+	if err := i.Client.Get(ctx, client.ObjectKey{
+		Namespace: i.Namespace,
+		Name:      image,
+	}, object); err != nil {
+		return err
+	}
+
 	// Check node image status
 	for _, release := range object.Status.Releases {
 		if release == i.Release {

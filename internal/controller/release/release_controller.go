@@ -81,7 +81,14 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Handle deleted release
 	if IsDeleted(release) {
 		log.Info("Release is being deleted", "release", release.Name)
-		if err := imageClient.RemoveImage(ctx, nodeImage.Name); err != nil {
+
+		// Remove release from image status
+		if err := imageClient.RemoveRelease(ctx, nodeImage.Name); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Handle deletion
+		if err := imageClient.DeleteImage(ctx, nodeImage.Name); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -105,8 +112,13 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Info("Finalizer added to Release", "finalizer", ReleaseControllerFinalizer, "release", release.Name)
 	}
 
-	// Handle normal release
-	if err := imageClient.CreateOrUpdateImage(ctx, nodeImage); err != nil {
+	// Handle creation
+	if err := imageClient.CreateImage(ctx, nodeImage); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Add Releases to the image status
+	if err := imageClient.AddRelease(ctx, nodeImage.Name); err != nil {
 		return ctrl.Result{}, err
 	}
 
