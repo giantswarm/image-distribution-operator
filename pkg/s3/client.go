@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // S3Client wraps the AWS SDK client
@@ -47,7 +47,9 @@ func New(c Config, ctx context.Context) (*Client, error) {
 }
 
 // Pull fetches an image from S3 and stores it locally
-func (c *Client) Pull(ctx context.Context, log logr.Logger, imageKey string) (string, error) {
+func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
+	log := log.FromContext(ctx)
+
 	log.Info("Starting to pull image from S3", "imageKey", imageKey, "bucketName", c.bucketName)
 
 	// Set timeout
