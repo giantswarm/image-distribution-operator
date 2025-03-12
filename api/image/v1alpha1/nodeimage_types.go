@@ -40,10 +40,10 @@ type NodeImageStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Releases is the list of releases that the image is used in
-	Releases []string `json:"releases,omitempty"`
+	Releases []string `json:"releases"`
 
 	// State is the state that the image is currently in
-	State string `json:"state,omitempty"`
+	State string `json:"state"`
 }
 
 // +kubebuilder:object:root=true
@@ -55,7 +55,7 @@ type NodeImage struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   NodeImageSpec   `json:"spec,omitempty"`
-	Status NodeImageStatus `json:"status"`
+	Status NodeImageStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
