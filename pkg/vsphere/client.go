@@ -84,32 +84,36 @@ func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageNam
 		return nil, fmt.Errorf("failed to fetch OVF descriptor: %w", err)
 	}
 
+	// Create a new finder
+	finder := find.NewFinder(c.vsphere.Client, true)
+
 	// Get the datacenter object
-	dc, err := c.GetDatacenter(ctx)
+	dc, err := c.GetDatacenter(ctx, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datacenter: %w", err)
 	}
+	finder.SetDatacenter(dc)
 
 	// Get the datastore object
-	datastore, err := c.GetDatastore(ctx)
+	datastore, err := c.GetDatastore(ctx, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datastore: %w", err)
 	}
 
 	// Get the folder object
-	folder, err := c.GetFolder(ctx, dc, c.folder)
+	folder, err := c.GetFolder(ctx, c.folder, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
 	// Get the resource pool object
-	pool, err := c.GetResourcePool(ctx, dc, c.resourcepool)
+	pool, err := c.GetResourcePool(ctx, c.resourcepool, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
 	// Get the host object
-	host, err := c.GetHost(ctx, c.host)
+	host, err := c.GetHost(ctx, c.host, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
@@ -174,19 +178,16 @@ func (c *Client) CreateImportTask(ctx context.Context, config TaskConfig) (*nfc.
 }
 
 // GetDatacenter returns the datacenter object
-func (c *Client) GetDatacenter(ctx context.Context) (*object.Datacenter, error) {
-	finder := find.NewFinder(c.vsphere.Client, true)
+func (c *Client) GetDatacenter(ctx context.Context, finder *find.Finder) (*object.Datacenter, error) {
 	dc, err := finder.DatacenterOrDefault(ctx, c.datacenter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.datacenter, err)
 	}
-	finder.SetDatacenter(dc)
 	return dc, nil
 }
 
 // GetDatastore returns the datastore object
-func (c *Client) GetDatastore(ctx context.Context) (*object.Datastore, error) {
-	finder := find.NewFinder(c.vsphere.Client, true)
+func (c *Client) GetDatastore(ctx context.Context, finder *find.Finder) (*object.Datastore, error) {
 	datastore, err := finder.DatastoreOrDefault(ctx, c.datastore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find datastore %s: %w", c.datastore, err)
@@ -195,10 +196,7 @@ func (c *Client) GetDatastore(ctx context.Context) (*object.Datastore, error) {
 }
 
 // GetFolder returns the folder object
-func (c *Client) GetFolder(ctx context.Context, dc *object.Datacenter, folder string) (*object.Folder, error) {
-	finder := find.NewFinder(c.vsphere.Client, true)
-
-	// Find the folder
+func (c *Client) GetFolder(ctx context.Context, folder string, finder *find.Finder) (*object.Folder, error) {
 	folderObj, err := finder.FolderOrDefault(ctx, folder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
@@ -207,9 +205,8 @@ func (c *Client) GetFolder(ctx context.Context, dc *object.Datacenter, folder st
 }
 
 // GetHost returns the host object
-func (c *Client) GetHost(ctx context.Context, hostName string) (*object.HostSystem, error) {
-	finder := find.NewFinder(c.vsphere.Client, true)
-	host, err := finder.HostSystem(ctx, hostName)
+func (c *Client) GetHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
+	host, err := finder.HostSystemOrDefault(ctx, hostName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
 	}
@@ -217,10 +214,7 @@ func (c *Client) GetHost(ctx context.Context, hostName string) (*object.HostSyst
 }
 
 // GetResourcePool returns the resource pool object
-func (c *Client) GetResourcePool(ctx context.Context, dc *object.Datacenter, resourcePool string) (*object.ResourcePool, error) {
-	finder := find.NewFinder(c.vsphere.Client, true)
-
-	// Find the resource pool
+func (c *Client) GetResourcePool(ctx context.Context, resourcePool string, finder *find.Finder) (*object.ResourcePool, error) {
 	pool, err := finder.ResourcePoolOrDefault(ctx, resourcePool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find resource pool %s: %w", resourcePool, err)
