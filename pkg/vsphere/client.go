@@ -67,6 +67,59 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}, nil
 }
 
+// GetImportParams returns the import parameters
+func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageName string) (*nfc.Lease, error) {
+	// Fetch the OVF descriptor from the given URL
+	ovfDescriptor, err := FetchOVFDescriptor(ctx, imageURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch OVF descriptor: %w", err)
+	}
+
+	// Get the datacenter object
+	dc, err := c.GetDatacenter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datacenter: %w", err)
+	}
+
+	// Get the datastore object
+	datastore, err := c.GetDatastore(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datastore: %w", err)
+	}
+
+	// Get the folder object
+	folder, err := c.GetFolder(ctx, dc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+
+	// Get the resource pool object
+	pool, err := c.GetResourcePool(ctx, dc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resource pool: %w", err)
+	}
+
+	// Create the import parameters
+	importParams := types.OvfCreateImportSpecParams{
+		DiskProvisioning: "thin",
+		EntityName:       imageName,
+	}
+
+	// Create the import task
+	lease, err := c.CreateImportTask(ctx, TaskConfig{
+		ResourcePool:  pool,
+		Datastore:     datastore,
+		Folder:        folder,
+		OVFDescriptor: ovfDescriptor,
+		ImportParams:  importParams,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create import task: %w", err)
+	}
+
+	return lease, nil
+}
+
 type TaskConfig struct {
 	ResourcePool  *object.ResourcePool
 	Datastore     *object.Datastore
@@ -159,59 +212,6 @@ func (c *Client) GetResourcePool(ctx context.Context, dc *object.Datacenter) (*o
 		return nil, fmt.Errorf("failed to find default resource pool: %w", err)
 	}
 	return pool, nil
-}
-
-// GetImportParams returns the import parameters
-func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageName string) (*nfc.Lease, error) {
-	// Fetch the OVF descriptor from the given URL
-	ovfDescriptor, err := FetchOVFDescriptor(ctx, imageURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch OVF descriptor: %w", err)
-	}
-
-	// Get the datacenter object
-	dc, err := c.GetDatacenter(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get datacenter: %w", err)
-	}
-
-	// Get the datastore object
-	datastore, err := c.GetDatastore(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get datastore: %w", err)
-	}
-
-	// Get the folder object
-	folder, err := c.GetFolder(ctx, dc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get folder: %w", err)
-	}
-
-	// Get the resource pool object
-	pool, err := c.GetResourcePool(ctx, dc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get resource pool: %w", err)
-	}
-
-	// Create the import parameters
-	importParams := types.OvfCreateImportSpecParams{
-		DiskProvisioning: "thin",
-		EntityName:       imageName,
-	}
-
-	// Create the import task
-	lease, err := c.CreateImportTask(ctx, TaskConfig{
-		ResourcePool:  pool,
-		Datastore:     datastore,
-		Folder:        folder,
-		OVFDescriptor: ovfDescriptor,
-		ImportParams:  importParams,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create import task: %w", err)
-	}
-
-	return lease, nil
 }
 
 // FetchOVFDescriptor fetches the OVF descriptor from the given URL
