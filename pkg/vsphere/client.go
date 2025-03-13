@@ -18,21 +18,27 @@ import (
 
 // Client wraps the govmomi client
 type Client struct {
-	vsphere    *govmomi.Client
-	url        string
-	datacenter string
-	datastore  string
-	username   string
-	password   string
+	vsphere      *govmomi.Client
+	url          string
+	datacenter   string
+	datastore    string
+	username     string
+	password     string
+	folder       string
+	host         string
+	resourcepool string
 }
 
 // Config holds the configuration for the vSphere client
 type Config struct {
-	URL        string
-	Username   string
-	Password   string
-	Datacenter string
-	Datastore  string
+	URL          string
+	Username     string
+	Password     string
+	Datacenter   string
+	Datastore    string
+	Folder       string
+	Host         string
+	ResourcePool string
 }
 
 // New initializes a new vSphere client
@@ -58,12 +64,15 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	log.Info("Successfully connected to vSphere", "vSphereURL", c.URL)
 
 	return &Client{
-		vsphere:    client,
-		url:        c.URL,
-		datacenter: c.Datacenter,
-		datastore:  c.Datastore,
-		username:   c.Username,
-		password:   c.Password,
+		vsphere:      client,
+		url:          c.URL,
+		datacenter:   c.Datacenter,
+		datastore:    c.Datastore,
+		username:     c.Username,
+		password:     c.Password,
+		folder:       c.Folder,
+		host:         c.Host,
+		resourcepool: c.ResourcePool,
 	}, nil
 }
 
@@ -88,15 +97,21 @@ func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageNam
 	}
 
 	// Get the folder object
-	folder, err := c.GetFolder(ctx, dc)
+	folder, err := c.GetFolder(ctx, dc, c.folder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
 	// Get the resource pool object
-	pool, err := c.GetResourcePool(ctx, dc)
+	pool, err := c.GetResourcePool(ctx, dc, c.resourcepool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
+	}
+
+	// Get the host object
+	host, err := c.GetHost(ctx, c.host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
 	// Create the import parameters
@@ -112,6 +127,7 @@ func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageNam
 		Folder:        folder,
 		OVFDescriptor: ovfDescriptor,
 		ImportParams:  importParams,
+		Host:          host,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create import task: %w", err)
@@ -179,16 +195,15 @@ func (c *Client) GetDatastore(ctx context.Context) (*object.Datastore, error) {
 }
 
 // GetFolder returns the folder object
-func (c *Client) GetFolder(ctx context.Context, dc *object.Datacenter) (*object.Folder, error) {
+func (c *Client) GetFolder(ctx context.Context, dc *object.Datacenter, folder string) (*object.Folder, error) {
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	// Find the default folder - we might want to do something more sophisticated here
-	finder.SetDatacenter(dc)
-	folder, err := finder.DefaultFolder(ctx)
+	// Find the folder
+	folderObj, err := finder.FolderOrDefault(ctx, folder)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find default folder: %w", err)
+		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
 	}
-	return folder, nil
+	return folderObj, nil
 }
 
 // GetHost returns the host object
@@ -202,14 +217,13 @@ func (c *Client) GetHost(ctx context.Context, hostName string) (*object.HostSyst
 }
 
 // GetResourcePool returns the resource pool object
-func (c *Client) GetResourcePool(ctx context.Context, dc *object.Datacenter) (*object.ResourcePool, error) {
+func (c *Client) GetResourcePool(ctx context.Context, dc *object.Datacenter, resourcePool string) (*object.ResourcePool, error) {
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	// Find the default resource pool - we might want to do something more sophisticated here
-	finder.SetDatacenter(dc)
-	pool, err := finder.DefaultResourcePool(ctx)
+	// Find the resource pool
+	pool, err := finder.ResourcePoolOrDefault(ctx, resourcePool)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find default resource pool: %w", err)
+		return nil, fmt.Errorf("failed to find resource pool %s: %w", resourcePool, err)
 	}
 	return pool, nil
 }
