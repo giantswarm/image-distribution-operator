@@ -80,7 +80,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Handle deleted release
 	if IsDeleted(release) {
-		log.Info("Release is being deleted", "release", release.Name)
+		log.Info("Release is being deleted")
 
 		// Remove release from image status
 		if err := imageClient.RemoveReleaseFromNodeImageStatus(ctx, nodeImage.Name); err != nil {
@@ -98,7 +98,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Update(ctx, release); err != nil {
 				return ctrl.Result{}, err
 			}
-			log.Info("Finalizer removed from Release", "finalizer", ReleaseControllerFinalizer, "release", release.Name)
+			log.Info("Finalizer removed from Release", "finalizer", ReleaseControllerFinalizer)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -109,7 +109,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err := r.Update(ctx, release); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info("Finalizer added to Release", "finalizer", ReleaseControllerFinalizer, "release", release.Name)
+		log.Info("Finalizer added to Release", "finalizer", ReleaseControllerFinalizer)
 	}
 
 	// Handle creation
