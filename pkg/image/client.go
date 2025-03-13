@@ -47,7 +47,7 @@ func New(c Config) (*Client, error) {
 	return client, nil
 }
 
-func (i *Client) RemoveRelease(ctx context.Context, image string) error {
+func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image string) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object
@@ -102,24 +102,17 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 func (i *Client) CreateImage(ctx context.Context, image *images.NodeImage) error {
 	log := log.FromContext(ctx)
 
-	// Get Image Object
-	object := &images.NodeImage{}
-	if err := i.Client.Get(ctx, client.ObjectKey{
-		Namespace: i.Namespace,
-		Name:      image.Name,
-	}, object); err != nil {
-		if apierrors.IsNotFound(err) {
-			// Create the Image if it does not exist yet
-			log.Info("Creating node image object", "nodeImage", image.Name)
-			image.Namespace = i.Namespace
-			return i.Create(ctx, image)
-		}
+	err := i.Create(ctx, image)
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
+	log.Info("Created node image", "nodeImage", image.Name)
 	return nil
 }
 
-func (i *Client) AddRelease(ctx context.Context, image string) error {
+func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object

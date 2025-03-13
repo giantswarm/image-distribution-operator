@@ -53,6 +53,7 @@ func TestRemoveImage(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			ctx := context.TODO()
 
 			var fakeClient client.Client
 			{
@@ -66,7 +67,7 @@ func TestRemoveImage(t *testing.T) {
 			}
 
 			if tc.existingImage != nil {
-				err := fakeClient.Create(context.TODO(), tc.existingImage)
+				err := fakeClient.Create(ctx, tc.existingImage)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -79,14 +80,14 @@ func TestRemoveImage(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			err = c.RemoveRelease(context.TODO(), "test-image")
+			err = c.RemoveReleaseFromNodeImageStatus(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
-			err = c.DeleteImage(context.TODO(), "test-image")
+			err = c.DeleteImage(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
 			fetchedImage := &images.NodeImage{}
-			err = fakeClient.Get(context.TODO(), client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
+			err = fakeClient.Get(ctx, client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
 
 			if tc.expectDeleted {
 				assert.Error(t, err) // Should be deleted
@@ -190,7 +191,7 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			err = c.CreateImage(ctx, image)
 			assert.Equal(t, tc.expectedError, err)
 
-			err = c.AddRelease(ctx, "test-image")
+			err = c.AddReleaseToNodeImageStatus(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
 			fetchedImage := &images.NodeImage{}
