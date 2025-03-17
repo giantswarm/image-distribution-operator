@@ -1,17 +1,22 @@
 package vsphere
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/nfc"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -27,6 +32,7 @@ type Client struct {
 	folder       string
 	host         string
 	resourcepool string
+	network      string
 }
 
 // Config holds the configuration for the vSphere client
@@ -39,6 +45,7 @@ type Config struct {
 	Folder       string
 	Host         string
 	ResourcePool string
+	Network      string
 }
 
 // New initializes a new vSphere client
@@ -78,8 +85,9 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 // GetImportParams returns the import parameters
 func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageName string) (*nfc.Lease, error) {
+
 	// Fetch the OVF descriptor from the given URL
-	ovfDescriptor, err := FetchOVFDescriptor(ctx, imageURL)
+	ovfDescriptor, err := FetchOVFDescriptorFromOVA(ctx, imageURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch OVF descriptor: %w", err)
 	}
@@ -112,16 +120,26 @@ func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageNam
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
-	// Get the host object
 	host, err := c.GetHost(ctx, c.host, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
+	}
+
+	network, err := c.GetNetwork(ctx, c.network, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get network: %w", err)
 	}
 
 	// Create the import parameters
 	importParams := types.OvfCreateImportSpecParams{
 		DiskProvisioning: "thin",
 		EntityName:       imageName,
+		NetworkMapping: []types.OvfNetworkMapping{
+			{
+				Name:    "nic0",
+				Network: network,
+			},
+		},
 	}
 
 	// Create the import task
@@ -132,6 +150,7 @@ func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageNam
 		OVFDescriptor: ovfDescriptor,
 		ImportParams:  importParams,
 		Host:          host,
+		RemotePath:    imageURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create import task: %w", err)
@@ -147,6 +166,7 @@ type TaskConfig struct {
 	OVFDescriptor string
 	ImportParams  types.OvfCreateImportSpecParams
 	Host          *object.HostSystem
+	RemotePath    string
 }
 
 // CreateImportTask creates an OVA import task and returns the lease
@@ -206,9 +226,23 @@ func (c *Client) GetFolder(ctx context.Context, folder string, finder *find.Find
 
 // GetHost returns the host object
 func (c *Client) GetHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
-	host, err := finder.HostSystemOrDefault(ctx, hostName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
+	var host *object.HostSystem
+	var err error
+	if hostName != "" {
+		host, err = finder.HostSystemOrDefault(ctx, hostName)
+		fmt.Printf("%v", host)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
+		}
+	} else {
+		hosts, err := finder.HostSystemList(ctx, "*") // Get all hosts
+		if err != nil {
+			return nil, fmt.Errorf("failed to list hosts: %w", err)
+		}
+		if len(hosts) == 0 {
+			return nil, fmt.Errorf("no hosts found in vSphere")
+		}
+		host = hosts[0]
 	}
 	return host, nil
 }
@@ -222,19 +256,118 @@ func (c *Client) GetResourcePool(ctx context.Context, resourcePool string, finde
 	return pool, nil
 }
 
-// FetchOVFDescriptor fetches the OVF descriptor from the given URL
-func FetchOVFDescriptor(ctx context.Context, imageURL string) (string, error) {
-	resp, err := http.Get(imageURL)
+// GetNetwork returns the network object
+func (c *Client) GetNetwork(ctx context.Context, networkName string, finder *find.Finder) (types.ManagedObjectReference, error) {
+	var network object.NetworkReference
+	var err error
+	if networkName != "" {
+		network, err = finder.NetworkOrDefault(ctx, networkName)
+		if err != nil {
+			return types.ManagedObjectReference{}, fmt.Errorf("failed to find network %s: %w", networkName, err)
+		}
+	} else {
+		networks, err := finder.NetworkList(ctx, "*") // Get all networks
+		if err != nil {
+			return types.ManagedObjectReference{}, fmt.Errorf("failed to list networks: %w", err)
+		}
+		if len(networks) == 0 {
+			return types.ManagedObjectReference{}, fmt.Errorf("no networks found in vSphere")
+		}
+		network = networks[0]
+	}
+	return network.Reference(), nil
+}
+
+// This was done by chatgpt, TODO: make it cleaner
+func FetchOVFDescriptorFromOVA(ctx context.Context, ovaURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ovaURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch OVF descriptor: %w", err)
+		return "", fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch OVA: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Read the OVF descriptor into a string
-	ovfDescriptor, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read OVF descriptor: %w", err)
+	// Detect if the OVA is compressed (gzipped)
+	var tarReader *tar.Reader
+	if strings.HasSuffix(ovaURL, ".gz") {
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer gzipReader.Close()
+		tarReader = tar.NewReader(gzipReader)
+	} else {
+		tarReader = tar.NewReader(resp.Body)
 	}
 
-	return string(ovfDescriptor), nil
+	// Scan the OVA tar archive for the OVF descriptor
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		// Find the .ovf file
+		if strings.HasSuffix(header.Name, ".ovf") {
+			ovfData, err := io.ReadAll(tarReader)
+			if err != nil {
+				return "", fmt.Errorf("failed to read OVF descriptor: %w", err)
+			}
+			return string(ovfData), nil
+		}
+	}
+
+	return "", fmt.Errorf("no OVF descriptor found in OVA")
+}
+
+// WIP
+// UploadToLease uploads the OVA to vSphere using the lease URLs.
+func (c *Client) UploadToLease(ctx context.Context, lease *nfc.Lease, localOVAPath string) error {
+	log := log.FromContext(ctx)
+
+	info, err := lease.Wait(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get lease info: %w", err)
+	}
+
+	updater := lease.StartUpdater(ctx, info)
+	defer updater.Done()
+
+	soapClient := c.vsphere.Client.Client
+
+	for _, item := range info.Items {
+		log.Info(fmt.Sprintf("Uploading file %s to %s", item.DeviceId, item.URL.String()))
+
+		file, err := os.Open(localOVAPath)
+		if err != nil {
+			return fmt.Errorf("failed to open OVA file: %w", err)
+		}
+		defer file.Close()
+
+		fileStat, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("failed to get file size: %w", err)
+		}
+
+		// !this fails rn
+		err = soapClient.Upload(
+			ctx,
+			file,
+			item.URL,
+			&soap.Upload{ContentLength: fileStat.Size()},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to upload OVA: %w", err)
+		}
+	}
+
+	log.Info("OVA successfully uploaded to vSphere!")
+	return nil
 }
