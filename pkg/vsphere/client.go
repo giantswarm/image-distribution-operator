@@ -10,13 +10,14 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/nfc"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf"
+	"github.com/vmware/govmomi/ovf/importer"
+	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -82,6 +83,101 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		host:         c.Host,
 		resourcepool: c.ResourcePool,
 	}, nil
+}
+
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string) (*types.ManagedObjectReference, error) {
+	// Create a new finder
+	finder := find.NewFinder(c.vsphere.Client, true)
+
+	// Get the datacenter object
+	dc, err := c.GetDatacenter(ctx, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datacenter: %w", err)
+	}
+	finder.SetDatacenter(dc)
+
+	// Get the datastore object
+	datastore, err := c.GetDatastore(ctx, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datastore: %w", err)
+	}
+
+	// Get the folder object
+	folder, err := c.GetFolder(ctx, c.folder, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+
+	// Get the resource pool object
+	pool, err := c.GetResourcePool(ctx, c.resourcepool, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resource pool: %w", err)
+	}
+
+	host, err := c.GetHost(ctx, c.host, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host: %w", err)
+	}
+
+	network, err := c.GetNetwork(ctx, c.network, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get network: %w", err)
+	}
+
+	options := &importer.Options{
+		Name: &imageName,
+		NetworkMapping: []importer.Network{
+			{
+				Name:    "nic0",
+				Network: network.String(),
+			},
+		},
+	}
+
+	importer := c.getImporter(
+		ctx,
+		ImporterConfig{
+			Name:         imageName,
+			Datacenter:   dc,
+			Datastore:    datastore,
+			Folder:       folder,
+			Host:         host,
+			ResourcePool: pool,
+			Finder:       finder,
+			Path:         imageURL,
+		},
+	)
+
+	// Use `importer.Import` to handle OVA import automatically
+	return importer.Import(ctx, imageURL, *options)
+}
+
+type ImporterConfig struct {
+	Name         string
+	Datacenter   *object.Datacenter
+	Datastore    *object.Datastore
+	Folder       *object.Folder
+	Host         *object.HostSystem
+	Network      types.ManagedObjectReference
+	ResourcePool *object.ResourcePool
+	Finder       *find.Finder
+	Path         string
+}
+
+func (c *Client) getImporter(ctx context.Context, config ImporterConfig) *importer.Importer {
+	return &importer.Importer{
+		Name:         config.Name,
+		Client:       c.vsphere.Client,
+		Datacenter:   config.Datacenter,
+		Datastore:    config.Datastore,
+		Folder:       config.Folder,
+		Host:         config.Host,
+		ResourcePool: config.ResourcePool,
+		Finder:       config.Finder,
+		Sinker:       &progress.ProgressLogger{},
+		Archive:      &importer.TapeArchive{Path: config.Path},
+		Manifest:     nil, // Placeholder, update if needed
+	}
 }
 
 // GetImportParams returns the import parameters
@@ -352,8 +448,6 @@ func (c *Client) UploadToLease(ctx context.Context, lease *nfc.Lease, localOVAPa
 		return fmt.Errorf("failed to get file size: %w", err)
 	}
 
-	go c.keepLeaseAlive(ctx, lease) // actually never mind this is shit i think???
-
 	for _, item := range info.Items {
 		log.Info(fmt.Sprintf("Uploading file %s to %s", item.DeviceId, item.URL.String()))
 
@@ -366,14 +460,6 @@ func (c *Client) UploadToLease(ctx context.Context, lease *nfc.Lease, localOVAPa
 
 	log.Info("OVA successfully uploaded to vSphere!")
 	return nil
-}
-
-// keepLeaseAlive periodically updates lease progress to prevent timeout.
-func (c *Client) keepLeaseAlive(ctx context.Context, lease *nfc.Lease) {
-	for progress := int32(0); progress < 100; progress += 10 {
-		time.Sleep(10 * time.Second) // Update progress every 10 seconds
-		_ = lease.Progress(ctx, progress)
-	}
 }
 
 func (c *Client) MonitorLeaseProgress(ctx context.Context, lease *nfc.Lease, items []types.OvfFileItem) (*nfc.LeaseInfo, *nfc.LeaseUpdater, error) {
