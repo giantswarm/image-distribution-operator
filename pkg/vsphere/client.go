@@ -9,7 +9,6 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf/importer"
-	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -39,6 +38,19 @@ type Config struct {
 	Host         string
 	ResourcePool string
 	Network      string
+}
+
+// ImporterConfig holds the configuration for the OVF importer
+type ImporterConfig struct {
+	Name         string
+	Datacenter   *object.Datacenter
+	Datastore    *object.Datastore
+	Folder       *object.Folder
+	Host         *object.HostSystem
+	Network      types.ManagedObjectReference
+	ResourcePool *object.ResourcePool
+	Finder       *find.Finder
+	Path         string
 }
 
 // New initializes a new vSphere client
@@ -76,41 +88,39 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Import(ctx context.Context, imageURL string, imagePath string, imageName string) (*types.ManagedObjectReference, error) {
-	// Create a new finder
+// Import imports an OVF image to vSphere
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string) (*types.ManagedObjectReference, error) {
+	log := log.FromContext(ctx)
+
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	// Get the datacenter object
-	dc, err := c.GetDatacenter(ctx, finder)
+	dc, err := c.getDatacenter(ctx, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datacenter: %w", err)
 	}
 	finder.SetDatacenter(dc)
 
-	// Get the datastore object
-	datastore, err := c.GetDatastore(ctx, finder)
+	datastore, err := c.getDatastore(ctx, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datastore: %w", err)
 	}
 
-	// Get the folder object
-	folder, err := c.GetFolder(ctx, c.folder, finder)
+	folder, err := c.getFolder(ctx, c.folder, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
-	// Get the resource pool object
-	pool, err := c.GetResourcePool(ctx, c.resourcepool, finder)
+	pool, err := c.getResourcePool(ctx, c.resourcepool, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
-	host, err := c.GetHost(ctx, c.host, finder)
+	host, err := c.getHost(ctx, c.host, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
-	network, err := c.GetNetwork(ctx, c.network, finder)
+	network, err := c.getNetwork(ctx, c.network, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network: %w", err)
 	}
@@ -139,39 +149,23 @@ func (c *Client) Import(ctx context.Context, imageURL string, imagePath string, 
 		},
 	)
 
-	// Use `importer.Import` to handle OVA import automatically
+	log.Info("Importing OVF", "imageURL", imageURL, "imageName", imageName)
+
 	return importer.Import(ctx, "*.ovf", *options)
 }
 
-func (c *Client) Deploy(ctx context.Context, ref types.ManagedObjectReference) error {
+// Process processes the OVF image
+func (c *Client) Process(ctx context.Context, ref types.ManagedObjectReference) error {
+	log := log.FromContext(ctx)
 	vm := object.NewVirtualMachine(c.vsphere.Client, ref)
 	// todo: do stuff with vm
-	fmt.Printf("Deploying VM: %v", vm)
+	log.Info("Processed vm", "vm", vm.Name())
 	return nil
 }
 
-type ImporterConfig struct {
-	Name         string
-	Datacenter   *object.Datacenter
-	Datastore    *object.Datastore
-	Folder       *object.Folder
-	Host         *object.HostSystem
-	Network      types.ManagedObjectReference
-	ResourcePool *object.ResourcePool
-	Finder       *find.Finder
-	Path         string
-}
-
 func (c *Client) getImporter(ctx context.Context, config ImporterConfig) *importer.Importer {
-	fmt.Printf("config: %v", config)
-
 	archive := &importer.TapeArchive{Path: config.Path}
 	archive.Client = c.vsphere.Client
-
-	logger := progress.NewProgressLogger(func(msg string) (int, error) {
-		fmt.Println(msg) // Log the message
-		return len(msg), nil
-	}, "upload")
 
 	return &importer.Importer{
 		Name:           config.Name,
@@ -182,16 +176,15 @@ func (c *Client) getImporter(ctx context.Context, config ImporterConfig) *import
 		Host:           config.Host,
 		ResourcePool:   config.ResourcePool,
 		Finder:         config.Finder,
-		Sinker:         logger,
-		Log:            func(msg string) (int, error) { return len(msg), nil },
+		Log:            func(msg string) (int, error) { return fmt.Print(msg) },
 		Archive:        archive,
 		Manifest:       nil, // Placeholder, update if needed
 		VerifyManifest: false,
 	}
 }
 
-// GetDatacenter returns the datacenter object
-func (c *Client) GetDatacenter(ctx context.Context, finder *find.Finder) (*object.Datacenter, error) {
+// getDatacenter returns the datacenter object
+func (c *Client) getDatacenter(ctx context.Context, finder *find.Finder) (*object.Datacenter, error) {
 	dc, err := finder.DatacenterOrDefault(ctx, c.datacenter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.datacenter, err)
@@ -199,8 +192,8 @@ func (c *Client) GetDatacenter(ctx context.Context, finder *find.Finder) (*objec
 	return dc, nil
 }
 
-// GetDatastore returns the datastore object
-func (c *Client) GetDatastore(ctx context.Context, finder *find.Finder) (*object.Datastore, error) {
+// getDatastore returns the datastore object
+func (c *Client) getDatastore(ctx context.Context, finder *find.Finder) (*object.Datastore, error) {
 	datastore, err := finder.DatastoreOrDefault(ctx, c.datastore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find datastore %s: %w", c.datastore, err)
@@ -208,8 +201,8 @@ func (c *Client) GetDatastore(ctx context.Context, finder *find.Finder) (*object
 	return datastore, nil
 }
 
-// GetFolder returns the folder object
-func (c *Client) GetFolder(ctx context.Context, folder string, finder *find.Finder) (*object.Folder, error) {
+// getFolder returns the folder object
+func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Finder) (*object.Folder, error) {
 	folderObj, err := finder.FolderOrDefault(ctx, folder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
@@ -217,8 +210,8 @@ func (c *Client) GetFolder(ctx context.Context, folder string, finder *find.Find
 	return folderObj, nil
 }
 
-// GetHost returns the host object
-func (c *Client) GetHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
+// getHost returns the host object
+func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
 	var host *object.HostSystem
 	var err error
 	if hostName != "" {
@@ -240,8 +233,8 @@ func (c *Client) GetHost(ctx context.Context, hostName string, finder *find.Find
 	return host, nil
 }
 
-// GetResourcePool returns the resource pool object
-func (c *Client) GetResourcePool(ctx context.Context, resourcePool string, finder *find.Finder) (*object.ResourcePool, error) {
+// getResourcePool returns the resource pool object
+func (c *Client) getResourcePool(ctx context.Context, resourcePool string, finder *find.Finder) (*object.ResourcePool, error) {
 	pool, err := finder.ResourcePoolOrDefault(ctx, resourcePool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find resource pool %s: %w", resourcePool, err)
@@ -249,8 +242,8 @@ func (c *Client) GetResourcePool(ctx context.Context, resourcePool string, finde
 	return pool, nil
 }
 
-// GetNetwork returns the network object
-func (c *Client) GetNetwork(ctx context.Context, networkName string, finder *find.Finder) (types.ManagedObjectReference, error) {
+// getNetwork returns the network object
+func (c *Client) getNetwork(ctx context.Context, networkName string, finder *find.Finder) (types.ManagedObjectReference, error) {
 	var network object.NetworkReference
 	var err error
 	if networkName != "" {
