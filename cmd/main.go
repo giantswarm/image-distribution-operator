@@ -44,6 +44,7 @@ import (
 	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
 	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
+	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -71,12 +72,26 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+
 	var s3Bucket, s3Region string
 	var s3TimeoutSeconds int
+
+	var vsphereVcenterURL, vsphereUsername, vspherePassword string
+	var vsphereDatacenter, vsphereDatastore, vsphereFolder, vsphereHost, vsphereResourcePool string
+
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
+	flag.StringVar(&vsphereVcenterURL, "vsphere-vcenter-url", "", "The URL of the vCenter")
+	flag.StringVar(&vsphereUsername, "vsphere-username", "", "The username for the vCenter")
+	flag.StringVar(&vspherePassword, "vsphere-password", "", "The password for the vCenter")
+	flag.StringVar(&vsphereDatacenter, "vsphere-datacenter", "", "The datacenter in the vCenter")
+	flag.StringVar(&vsphereDatastore, "vsphere-datastore", "", "The datastore in the vCenter")
+	flag.StringVar(&vsphereFolder, "vsphere-folder", "", "The folder in the vCenter")
+	flag.StringVar(&vsphereHost, "vsphere-host", "", "The host in the vCenter")
+	flag.StringVar(&vsphereResourcePool, "vsphere-resource-pool", "", "The resource pool in the vCenter")
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -225,6 +240,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	vsphereClient, err := vsphere.New(vsphere.Config{
+		URL:          vsphereVcenterURL,
+		Username:     vsphereUsername,
+		Password:     vspherePassword,
+		Datacenter:   vsphereDatacenter,
+		Datastore:    vsphereDatastore,
+		Folder:       vsphereFolder,
+		Host:         vsphereHost,
+		ResourcePool: vsphereResourcePool,
+	}, context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to create vSphere client")
+		os.Exit(1)
+	}
+
 	if err = (&release.ReleaseReconciler{
 		Namespace: namespace,
 		Client:    mgr.GetClient(),
@@ -233,8 +263,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		S3Client: s3Client,
-		Client:   mgr.GetClient(),
+		S3Client:      s3Client,
+		VsphereClient: vsphereClient,
+		Client:        mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

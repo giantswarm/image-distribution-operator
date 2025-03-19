@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -96,42 +95,5 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 	}
 
 	log.Info("Completed download of image from S3", "imageKey", imageKey, "localFilePath", localFilePath)
-	return localFilePath, nil
-}
-
-// PullNoAuth fetches an image from S3 without authentication
-func (c *Client) PullNoAuth(ctx context.Context, imageKey string) (string, error) {
-	log := log.FromContext(ctx)
-
-	imageURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucketName, "eu-central-1", imageKey)
-	log.Info("Downloading image", "url", imageURL)
-
-	resp, err := http.Get(imageURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch image: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download image, status code: %d", resp.StatusCode)
-	}
-
-	if err := os.MkdirAll(Directory, 0700); err != nil {
-		return "", fmt.Errorf("failed to create local directory %s: %w", Directory, err)
-	}
-
-	localFilePath := filepath.Join(Directory, filepath.Base(imageKey))
-	file, err := os.Create(localFilePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to create local file: %w", err)
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to write image to file: %w", err)
-	}
-
-	log.Info("Image downloaded successfully", "path", localFilePath)
 	return localFilePath, nil
 }

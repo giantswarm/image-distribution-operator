@@ -136,7 +136,6 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string) 
 	}
 
 	importer := c.getImporter(
-		ctx,
 		ImporterConfig{
 			Name:         imageName,
 			Datacenter:   dc,
@@ -158,12 +157,12 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string) 
 func (c *Client) Process(ctx context.Context, ref types.ManagedObjectReference) error {
 	log := log.FromContext(ctx)
 	vm := object.NewVirtualMachine(c.vsphere.Client, ref)
-	// todo: do stuff with vm
+	vm.MarkAsTemplate(ctx)
 	log.Info("Processed vm", "vm", vm.Name())
 	return nil
 }
 
-func (c *Client) getImporter(ctx context.Context, config ImporterConfig) *importer.Importer {
+func (c *Client) getImporter(config ImporterConfig) *importer.Importer {
 	archive := &importer.TapeArchive{Path: config.Path}
 	archive.Client = c.vsphere.Client
 
@@ -234,22 +233,22 @@ func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Find
 }
 
 // getResourcePool returns the resource pool object
-func (c *Client) getResourcePool(ctx context.Context, resourcePool string, finder *find.Finder) (*object.ResourcePool, error) {
-	pool, err := finder.ResourcePoolOrDefault(ctx, resourcePool)
+func (c *Client) getResourcePool(ctx context.Context, rp string, finder *find.Finder) (*object.ResourcePool, error) {
+	pool, err := finder.ResourcePoolOrDefault(ctx, rp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find resource pool %s: %w", resourcePool, err)
+		return nil, fmt.Errorf("failed to find resource pool %s: %w", rp, err)
 	}
 	return pool, nil
 }
 
 // getNetwork returns the network object
-func (c *Client) getNetwork(ctx context.Context, networkName string, finder *find.Finder) (types.ManagedObjectReference, error) {
+func (c *Client) getNetwork(ctx context.Context, n string, finder *find.Finder) (types.ManagedObjectReference, error) {
 	var network object.NetworkReference
 	var err error
-	if networkName != "" {
-		network, err = finder.NetworkOrDefault(ctx, networkName)
+	if n != "" {
+		network, err = finder.NetworkOrDefault(ctx, n)
 		if err != nil {
-			return types.ManagedObjectReference{}, fmt.Errorf("failed to find network %s: %w", networkName, err)
+			return types.ManagedObjectReference{}, fmt.Errorf("failed to find network %s: %w", n, err)
 		}
 	} else {
 		networks, err := finder.NetworkList(ctx, "*") // Get all networks
