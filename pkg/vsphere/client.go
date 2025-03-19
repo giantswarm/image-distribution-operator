@@ -1,24 +1,15 @@
 package vsphere
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"os"
-	"strings"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
-	"github.com/vmware/govmomi/nfc"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/ovf"
 	"github.com/vmware/govmomi/ovf/importer"
 	"github.com/vmware/govmomi/vim25/progress"
-	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -85,7 +76,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string) (*types.ManagedObjectReference, error) {
+func (c *Client) Import(ctx context.Context, imageURL string, imagePath string, imageName string) (*types.ManagedObjectReference, error) {
 	// Create a new finder
 	finder := find.NewFinder(c.vsphere.Client, true)
 
@@ -149,7 +140,14 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string) 
 	)
 
 	// Use `importer.Import` to handle OVA import automatically
-	return importer.Import(ctx, imageURL, *options)
+	return importer.Import(ctx, "*.ovf", *options)
+}
+
+func (c *Client) Deploy(ctx context.Context, ref types.ManagedObjectReference) error {
+	vm := object.NewVirtualMachine(c.vsphere.Client, ref)
+	// todo: do stuff with vm
+	fmt.Printf("Deploying VM: %v", vm)
+	return nil
 }
 
 type ImporterConfig struct {
@@ -165,133 +163,31 @@ type ImporterConfig struct {
 }
 
 func (c *Client) getImporter(ctx context.Context, config ImporterConfig) *importer.Importer {
+	fmt.Printf("config: %v", config)
+
+	archive := &importer.TapeArchive{Path: config.Path}
+	archive.Client = c.vsphere.Client
+
+	logger := progress.NewProgressLogger(func(msg string) (int, error) {
+		fmt.Println(msg) // Log the message
+		return len(msg), nil
+	}, "upload")
+
 	return &importer.Importer{
-		Name:         config.Name,
-		Client:       c.vsphere.Client,
-		Datacenter:   config.Datacenter,
-		Datastore:    config.Datastore,
-		Folder:       config.Folder,
-		Host:         config.Host,
-		ResourcePool: config.ResourcePool,
-		Finder:       config.Finder,
-		Sinker:       &progress.ProgressLogger{},
-		Archive:      &importer.TapeArchive{Path: config.Path},
-		Manifest:     nil, // Placeholder, update if needed
+		Name:           config.Name,
+		Client:         c.vsphere.Client,
+		Datacenter:     config.Datacenter,
+		Datastore:      config.Datastore,
+		Folder:         config.Folder,
+		Host:           config.Host,
+		ResourcePool:   config.ResourcePool,
+		Finder:         config.Finder,
+		Sinker:         logger,
+		Log:            func(msg string) (int, error) { return len(msg), nil },
+		Archive:        archive,
+		Manifest:       nil, // Placeholder, update if needed
+		VerifyManifest: false,
 	}
-}
-
-// GetImportParams returns the import parameters
-func (c *Client) ImportOVAFromURL(ctx context.Context, imageURL string, imageName string) (*nfc.Lease, *[]types.OvfFileItem, error) {
-
-	// Fetch the OVF descriptor from the given URL
-	ovfDescriptor, err := FetchOVFDescriptorFromOVA(ctx, imageURL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch OVF descriptor: %w", err)
-	}
-
-	// Create a new finder
-	finder := find.NewFinder(c.vsphere.Client, true)
-
-	// Get the datacenter object
-	dc, err := c.GetDatacenter(ctx, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get datacenter: %w", err)
-	}
-	finder.SetDatacenter(dc)
-
-	// Get the datastore object
-	datastore, err := c.GetDatastore(ctx, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get datastore: %w", err)
-	}
-
-	// Get the folder object
-	folder, err := c.GetFolder(ctx, c.folder, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get folder: %w", err)
-	}
-
-	// Get the resource pool object
-	pool, err := c.GetResourcePool(ctx, c.resourcepool, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get resource pool: %w", err)
-	}
-
-	host, err := c.GetHost(ctx, c.host, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get host: %w", err)
-	}
-
-	network, err := c.GetNetwork(ctx, c.network, finder)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get network: %w", err)
-	}
-
-	// Create the import parameters
-	importParams := types.OvfCreateImportSpecParams{
-		DiskProvisioning: "thin",
-		EntityName:       imageName,
-		NetworkMapping: []types.OvfNetworkMapping{
-			{
-				Name:    "nic0",
-				Network: network,
-			},
-		},
-	}
-
-	// Create the import task
-	lease, items, err := c.CreateImportTask(ctx, TaskConfig{
-		ResourcePool:  pool,
-		Datastore:     datastore,
-		Folder:        folder,
-		OVFDescriptor: ovfDescriptor,
-		ImportParams:  importParams,
-		Host:          host,
-		RemotePath:    imageURL,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create import task: %w", err)
-	}
-
-	return lease, items, nil
-}
-
-type TaskConfig struct {
-	ResourcePool  *object.ResourcePool
-	Datastore     *object.Datastore
-	Folder        *object.Folder
-	OVFDescriptor string
-	ImportParams  types.OvfCreateImportSpecParams
-	Host          *object.HostSystem
-	RemotePath    string
-}
-
-// CreateImportTask creates an OVA import task and returns the lease
-func (c *Client) CreateImportTask(ctx context.Context, config TaskConfig) (*nfc.Lease, *[]types.OvfFileItem, error) {
-	ovfManager := ovf.NewManager(c.vsphere.Client)
-
-	importSpec, err := ovfManager.CreateImportSpec(
-		ctx,
-		config.OVFDescriptor,
-		config.ResourcePool,
-		config.Datastore,
-		&config.ImportParams,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create import spec: %w", err)
-	}
-
-	if importSpec.Error != nil {
-		return nil, nil, fmt.Errorf("import spec contains errors: %+v", importSpec.Error)
-	}
-
-	// Create the import task
-	lease, err := config.ResourcePool.ImportVApp(ctx, importSpec.ImportSpec, config.Folder, config.Host)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to start OVA import task: %w", err)
-	}
-
-	return lease, &importSpec.FileItem, nil
 }
 
 // GetDatacenter returns the datacenter object
@@ -373,117 +269,4 @@ func (c *Client) GetNetwork(ctx context.Context, networkName string, finder *fin
 		network = networks[0]
 	}
 	return network.Reference(), nil
-}
-
-// This was done by chatgpt, TODO: make it cleaner
-func FetchOVFDescriptorFromOVA(ctx context.Context, ovaURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ovaURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch OVA: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Detect if the OVA is compressed (gzipped)
-	var tarReader *tar.Reader
-	if strings.HasSuffix(ovaURL, ".gz") {
-		gzipReader, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("failed to create gzip reader: %w", err)
-		}
-		defer gzipReader.Close()
-		tarReader = tar.NewReader(gzipReader)
-	} else {
-		tarReader = tar.NewReader(resp.Body)
-	}
-
-	// Scan the OVA tar archive for the OVF descriptor
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break // End of archive
-		}
-		if err != nil {
-			return "", fmt.Errorf("failed to read tar header: %w", err)
-		}
-
-		// Find the .ovf file
-		if strings.HasSuffix(header.Name, ".ovf") {
-			ovfData, err := io.ReadAll(tarReader)
-			if err != nil {
-				return "", fmt.Errorf("failed to read OVF descriptor: %w", err)
-			}
-			return string(ovfData), nil
-		}
-	}
-
-	return "", fmt.Errorf("no OVF descriptor found in OVA")
-}
-
-// WIP
-// UploadToLease uploads the OVA to vSphere using the lease URLs.
-func (c *Client) UploadToLease(ctx context.Context, lease *nfc.Lease, localOVAPath string, items []types.OvfFileItem) error {
-	log := log.FromContext(ctx)
-
-	info, updater, err := c.MonitorLeaseProgress(ctx, lease, items)
-	if err != nil {
-		return err
-	}
-	defer updater.Done() // Stop progress updater
-
-	file, err := os.Open(localOVAPath)
-	if err != nil {
-		lease.Abort(ctx, &types.LocalizedMethodFault{LocalizedMessage: "Failed to open OVA"})
-		return fmt.Errorf("failed to open OVA file: %w", err)
-	}
-	defer file.Close()
-
-	fileStat, err := file.Stat()
-	if err != nil {
-		lease.Abort(ctx, &types.LocalizedMethodFault{LocalizedMessage: "Failed to get file size"})
-		return fmt.Errorf("failed to get file size: %w", err)
-	}
-
-	for _, item := range info.Items {
-		log.Info(fmt.Sprintf("Uploading file %s to %s", item.DeviceId, item.URL.String()))
-
-		err = lease.Upload(ctx, item, file, soap.Upload{ContentLength: fileStat.Size()})
-		if err != nil {
-			lease.Abort(ctx, &types.LocalizedMethodFault{LocalizedMessage: "Upload failed"})
-			return fmt.Errorf("failed to upload OVA: %w", err)
-		}
-	}
-
-	log.Info("OVA successfully uploaded to vSphere!")
-	return nil
-}
-
-func (c *Client) MonitorLeaseProgress(ctx context.Context, lease *nfc.Lease, items []types.OvfFileItem) (*nfc.LeaseInfo, *nfc.LeaseUpdater, error) {
-	log := log.FromContext(ctx)
-
-	info, err := lease.Wait(ctx, items)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get lease info: %w", err)
-	}
-
-	log.Info("Lease acquired. Starting progress updater...")
-	updater := lease.StartUpdater(ctx, info)
-
-	return info, updater, nil
-}
-
-func (c *Client) CompleteLease(ctx context.Context, lease *nfc.Lease) error {
-	log := log.FromContext(ctx)
-
-	err := lease.Complete(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to complete lease: %w", err)
-	}
-
-	log.Info("Lease completed successfully.")
-	return nil
 }
