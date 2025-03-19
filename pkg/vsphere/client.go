@@ -157,7 +157,12 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string) 
 func (c *Client) Process(ctx context.Context, ref types.ManagedObjectReference) error {
 	log := log.FromContext(ctx)
 	vm := object.NewVirtualMachine(c.vsphere.Client, ref)
-	vm.MarkAsTemplate(ctx)
+
+	err := vm.MarkAsTemplate(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark vm as template: %w", err)
+	}
+
 	log.Info("Processed vm", "vm", vm.Name())
 	return nil
 }
