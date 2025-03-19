@@ -101,7 +101,7 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 
 func (i *Client) CreateImage(ctx context.Context, image *images.NodeImage) error {
 	log := log.FromContext(ctx)
-    image.Namespace = i.Namespace
+	image.Namespace = i.Namespace
 	err := i.Create(ctx, image)
 	if apierrors.IsAlreadyExists(err) {
 		return nil
