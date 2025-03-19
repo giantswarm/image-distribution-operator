@@ -27,10 +27,6 @@ func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (
 
 func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage {
 	return &images.NodeImage{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "image.giantswarm.io/v1alpha1",
-			Kind:       "NodeImage",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: strings.Join([]string{providerName, imageName}, "-"),
 		},
@@ -38,9 +34,6 @@ func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage
 		Spec: images.NodeImageSpec{
 			Name:     imageName,
 			Provider: providerName,
-		},
-		Status: images.NodeImageStatus{
-			Releases: []string{releaseName},
 		},
 	}
 }

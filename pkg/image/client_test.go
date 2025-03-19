@@ -53,6 +53,7 @@ func TestRemoveImage(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			ctx := context.TODO()
 
 			var fakeClient client.Client
 			{
@@ -66,7 +67,7 @@ func TestRemoveImage(t *testing.T) {
 			}
 
 			if tc.existingImage != nil {
-				err := fakeClient.Create(context.TODO(), tc.existingImage)
+				err := fakeClient.Create(ctx, tc.existingImage)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -79,11 +80,14 @@ func TestRemoveImage(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			err = c.RemoveImage(context.TODO(), "test-image")
+			err = c.RemoveReleaseFromNodeImageStatus(ctx, "test-image")
+			assert.Equal(t, tc.expectedError, err)
+
+			err = c.DeleteImage(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
 			fetchedImage := &images.NodeImage{}
-			err = fakeClient.Get(context.TODO(), client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
+			err = fakeClient.Get(ctx, client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
 
 			if tc.expectDeleted {
 				assert.Error(t, err) // Should be deleted
@@ -110,7 +114,7 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			release:          "v1.0.0",
 			existingImage:    nil, // No pre-existing image
 			expectedCreated:  true,
-			expectedReleases: []string{}, // status not yet set
+			expectedReleases: []string{"v1.0.0"}, // status not yet set
 		},
 		{
 			name:    "case 1: image exists but does not have release, should add release",
@@ -131,6 +135,16 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			},
 			expectedCreated:  false,
 			expectedReleases: []string{"v1.0.0"}, // Should not duplicate
+		},
+		{
+			name:    "case 3: image already contains multiple releases, should add release",
+			release: "v1.0.0",
+			existingImage: &images.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-image", Namespace: "test-namespace"},
+				Status:     images.NodeImageStatus{Releases: []string{"v1.1.0", "v1.2.0"}},
+			},
+			expectedCreated:  false,
+			expectedReleases: []string{"v1.1.0", "v1.2.0", "v1.0.0"},
 		},
 	}
 
@@ -174,7 +188,10 @@ func TestCreateOrUpdateImage(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-image", Namespace: "test-namespace"},
 			}
 
-			err = c.CreateOrUpdateImage(ctx, image)
+			err = c.CreateImage(ctx, image)
+			assert.Equal(t, tc.expectedError, err)
+
+			err = c.AddReleaseToNodeImageStatus(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
 			fetchedImage := &images.NodeImage{}
