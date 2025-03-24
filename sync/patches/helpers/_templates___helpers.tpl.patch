@@ -13,7 +13,7 @@ index ab9bf4c..7d1a914 100644
 +{{- if .Values.controllerManager.container.image.tag }}
 +{{- .Values.controllerManager.container.image.tag }}
 +{{- else }}
-+{{- .Chart.AppVersion }}
++{{- .Chart.Version }}
 +{{- end }}
 +{{- end }}
  

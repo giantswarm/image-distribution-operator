@@ -19,19 +19,13 @@ rules:
 - apiGroups:
   - image.giantswarm.io
   resources:
-  - nodeimages/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - image.giantswarm.io
-  resources:
   - nodeimages/status
   verbs:
   - get
   - patch
   - update
 - apiGroups:
-  - release.giantswarm.io.giantswarm.io
+  - release.giantswarm.io
   resources:
   - releases
   verbs:
@@ -41,13 +35,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - release.giantswarm.io.giantswarm.io
-  resources:
-  - releases/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - release.giantswarm.io.giantswarm.io
+  - release.giantswarm.io
   resources:
   - releases/status
   verbs:

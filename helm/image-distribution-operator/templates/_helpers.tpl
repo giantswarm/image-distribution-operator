@@ -19,7 +19,7 @@ Define image tag.
 {{- if .Values.controllerManager.container.image.tag }}
 {{- .Values.controllerManager.container.image.tag }}
 {{- else }}
-{{- .Chart.AppVersion }}
+{{- .Chart.Version }}
 {{- end }}
 {{- end }}
 

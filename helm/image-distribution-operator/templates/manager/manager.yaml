@@ -55,6 +55,8 @@ spec:
             {{- toYaml .Values.controllerManager.container.securityContext | nindent 12 }}
           {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
           volumeMounts:
+            - mountPath: /tmp/images
+              name: image-storage
             {{- if and .Values.metrics.enable .Values.certmanager.enable }}
             - name: metrics-certs
               mountPath: /tmp/k8s-metrics-server/metrics-certs
@@ -67,6 +69,8 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.controllerManager.terminationGracePeriodSeconds }}
       {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
       volumes:
+        - name: image-storage
+          emptyDir: {}
         {{- if and .Values.metrics.enable .Values.certmanager.enable }}
         - name: metrics-certs
           secret:

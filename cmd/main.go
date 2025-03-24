@@ -17,10 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -41,6 +44,8 @@ import (
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
 	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
+	"github.com/giantswarm/image-distribution-operator/pkg/s3"
+	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -68,7 +73,27 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+
+	var s3Bucket, s3Region string
+	var s3TimeoutSeconds int
+
+	var vsphereVcenterURL, vsphereUsername, vspherePassword string
+	var vsphereDatacenter, vsphereDatastore, vsphereFolder, vsphereHost, vsphereCluster, vsphereResourcePool string
+
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
+	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
+	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
+	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
+	flag.StringVar(&vsphereVcenterURL, "vsphere-vcenter-url", "", "The URL of the vCenter server")
+	flag.StringVar(&vsphereUsername, "vsphere-username", "", "The username for vCenter")
+	flag.StringVar(&vspherePassword, "vsphere-password", "", "The password for vCenter")
+	flag.StringVar(&vsphereDatacenter, "vsphere-datacenter", "", "The datacenter in vCenter")
+	flag.StringVar(&vsphereDatastore, "vsphere-datastore", "", "The datastore in vCenter")
+	flag.StringVar(&vsphereFolder, "vsphere-folder", "", "The VM folder in vCenter")
+	flag.StringVar(&vsphereHost, "vsphere-host", "", "The vSphere host in vCenter")
+	flag.StringVar(&vsphereCluster, "vsphere-cluster", "", "The vSphere cluster in vCenter")
+	flag.StringVar(&vsphereResourcePool, "vsphere-resource-pool", "Resources", "(optional) The resource pool in vCenter")
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -207,18 +232,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	s3Client, err := s3.New(s3.Config{
+		BucketName: s3Bucket,
+		Region:     s3Region,
+		Timeout:    time.Duration(s3TimeoutSeconds) * time.Second,
+	}, context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to create S3 client")
+		os.Exit(1)
+	}
+
+	vsphereClient, err := vsphere.New(vsphere.Config{
+		URL:          vsphereVcenterURL,
+		Username:     vsphereUsername,
+		Password:     vspherePassword,
+		Datacenter:   vsphereDatacenter,
+		Datastore:    vsphereDatastore,
+		Folder:       vsphereFolder,
+		Host:         vsphereHost,
+		ResourcePool: fmt.Sprintf("/%s/host/%s/%s", vsphereDatacenter, vsphereCluster, vsphereResourcePool),
+	}, context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to create vSphere client")
+		os.Exit(1)
+	}
+
 	if err = (&release.ReleaseReconciler{
 		Namespace: namespace,
-		Log:       ctrl.Log.WithName("controllers").WithName("Release"),
 		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		S3Client:      s3Client,
+		VsphereClient: vsphereClient,
+		Client:        mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

@@ -20,4 +20,3 @@ helm dependency update helm/image-distribution-operator
 
 # Patches
 ./sync/patches/helpers/patch.sh
-./sync/patches/manager/patch.sh

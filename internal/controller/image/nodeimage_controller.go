@@ -19,23 +19,29 @@ package image
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	"github.com/giantswarm/image-distribution-operator/pkg/s3"
+	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
 
-	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+const (
+	NodeImageFinalizer = "image-distribution-operator.finalizers.giantswarm.io/node-image-controller"
 )
 
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	S3Client      *s3.Client
+	VsphereClient *vsphere.Client
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -47,9 +53,41 @@ type NodeImageReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
 func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Fetch the NodeImage instance
+	nodeImage := &imagev1alpha1.NodeImage{}
+	err := r.Get(ctx, req.NamespacedName, nodeImage)
+	if err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Handle deletion
+	if IsDeleted(nodeImage) {
+		log.Info("NodeImage is being deleted", "nodeImage", nodeImage.Name)
+		// TODO handle deletion
+
+		// Remove finalizer
+		if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
+			controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
+			if err := r.Update(ctx, nodeImage); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer
+	if !controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
+		controllerutil.AddFinalizer(nodeImage, NodeImageFinalizer)
+		if err := r.Update(ctx, nodeImage); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("Finalizer added to NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+	}
+
+	// TODO handle create/update
 
 	return ctrl.Result{}, nil
 }
@@ -60,4 +98,8 @@ func (r *NodeImageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&imagev1alpha1.NodeImage{}).
 		Named("image-nodeimage").
 		Complete(r)
+}
+
+func IsDeleted(nodeImage *imagev1alpha1.NodeImage) bool {
+	return !nodeImage.DeletionTimestamp.IsZero()
 }

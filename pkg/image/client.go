@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 )
@@ -15,14 +15,12 @@ import (
 type Config struct {
 	Client    client.Client
 	Namespace string
-	Log       logr.Logger
 	Release   string
 }
 
 // Client holds the client and the namespace for node image objects
 type Client struct {
 	client.Client
-	log       logr.Logger
 	Namespace string
 	Release   string
 }
@@ -42,7 +40,6 @@ func New(c Config) (*Client, error) {
 	// create a new ImageList object
 	client := &Client{
 		Client:    c.Client,
-		log:       c.Log,
 		Namespace: c.Namespace,
 		Release:   c.Release,
 	}
@@ -50,7 +47,9 @@ func New(c Config) (*Client, error) {
 	return client, nil
 }
 
-func (i *Client) RemoveImage(ctx context.Context, image string) error {
+func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
 	// Get Image Object
 	object := &images.NodeImage{}
 	if err := i.Client.Get(ctx, client.ObjectKey{
@@ -70,31 +69,61 @@ func (i *Client) RemoveImage(ctx context.Context, image string) error {
 			break
 		}
 	}
-	// If there are still releases in the list, update the object
-	if len(object.Status.Releases) > 0 {
-		i.log.Info(fmt.Sprintf("Removing release %s from status of node image %s", i.Release, object.Name))
-		return i.Client.Update(ctx, object)
-	}
-
-	// If there are no releases left, delete the object
-	i.log.Info(fmt.Sprintf("Deleting node image %s", object.Name))
-	return i.Client.Delete(ctx, object)
+	// Update the object
+	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
+	return i.Client.Update(ctx, object)
 }
 
-func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImage) error {
+func (i *Client) DeleteImage(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
 	// Get Image Object
 	object := &images.NodeImage{}
 	if err := i.Client.Get(ctx, client.ObjectKey{
 		Namespace: i.Namespace,
-		Name:      image.Name,
+		Name:      image,
 	}, object); err != nil {
 		if apierrors.IsNotFound(err) {
-			// Create the Image if it does not exist yet
-			i.log.Info(fmt.Sprintf("Creating node image %s", object.Name))
-			return i.Create(ctx, image)
+			return nil
 		}
 		return err
 	}
+
+	// If there are still releases in the list, nothing to do
+	if len(object.Status.Releases) > 0 {
+		return nil
+	}
+
+	// If there are no releases left, delete the object
+	log.Info("Deleting node image", "nodeImage", object.Name)
+	return i.Client.Delete(ctx, object)
+}
+
+func (i *Client) CreateImage(ctx context.Context, image *images.NodeImage) error {
+	log := log.FromContext(ctx)
+	image.Namespace = i.Namespace
+	err := i.Create(ctx, image)
+	if apierrors.IsAlreadyExists(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	log.Info("Created node image", "nodeImage", image.Name)
+	return nil
+}
+
+func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) error {
+	log := log.FromContext(ctx)
+
+	// Get Image Object
+	object := &images.NodeImage{}
+	if err := i.Client.Get(ctx, client.ObjectKey{
+		Namespace: i.Namespace,
+		Name:      image,
+	}, object); err != nil {
+		return err
+	}
+
 	// Check node image status
 	for _, release := range object.Status.Releases {
 		if release == i.Release {
@@ -105,6 +134,6 @@ func (i *Client) CreateOrUpdateImage(ctx context.Context, image *images.NodeImag
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
-	i.log.Info(fmt.Sprintf("Adding release %s to the status of node image %s", i.Release, object.Name))
-	return i.Client.Update(ctx, object)
+	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
+	return i.Client.Status().Update(ctx, object)
 }
