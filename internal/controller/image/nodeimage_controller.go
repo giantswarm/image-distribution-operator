@@ -238,7 +238,7 @@ func ValidURL(url string) error {
 	defer func() {
 		if resp.Body != nil {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Printf("Failed to close response body: %w", err)
+				fmt.Printf("Failed to close response body: %v", err)
 			}
 		}
 	}()
