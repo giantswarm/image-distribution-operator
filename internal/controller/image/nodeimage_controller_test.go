@@ -41,12 +41,7 @@ var _ = Describe("NodeImage Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		nodeimage := &imagev1alpha1.NodeImage{
-			Spec: imagev1alpha1.NodeImageSpec{
-				Name:     resourceName,
-				Provider: "test",
-			},
-		}
+		nodeimage := &imagev1alpha1.NodeImage{}
 
 		s3Client, err := s3.New(s3.Config{
 			BucketName: "test-bucket",
@@ -64,7 +59,10 @@ var _ = Describe("NodeImage Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: imagev1alpha1.NodeImageSpec{
+						Name:     resourceName,
+						Provider: "test",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
