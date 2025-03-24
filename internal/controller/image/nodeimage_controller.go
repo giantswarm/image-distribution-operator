@@ -35,7 +35,7 @@ import (
 
 const (
 	NodeImageFinalizer = "image-distribution-operator.finalizers.giantswarm.io/node-image-controller"
-	ProviderVsphere    = "vsphere"
+	ProviderVsphere    = "capv"
 )
 
 // NodeImageReconciler reconciles a NodeImage object

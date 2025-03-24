@@ -22,6 +22,8 @@ func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (
 		return &images.NodeImage{}, err
 	}
 
+	provider := getProviderFromProviderName(providerName)
+
 	return GetNodeImage(imageName, providerName, release.Name), nil
 }
 
@@ -90,7 +92,7 @@ func getImageProvider(release string) (string, error) {
 // taken from github.com/giantswarm/capi-image-builder
 func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion string) string {
 	return fmt.Sprintf(
-		"flatcar-%s-%s-kube-%s-tooling-%s-gs",
+		"flatcar-%s-%s-kube-%s-tooling-%s",
 		flatcarChannel,
 		flatcarVersion,
 		strings.TrimPrefix(kubernetesVersion, "v"),
@@ -112,4 +114,13 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 
 func GetImageKey(nodeImage *images.NodeImage) string {
 	return fmt.Sprintf("%s/%s-gs/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, nodeImage.Spec.Name)
+}
+
+func getProviderFromProviderName(providerName string) string {
+	switch providerName {
+	case "vsphere":
+		return "capv"
+	default:
+		return "unknown"
+	}
 }
