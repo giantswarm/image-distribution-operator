@@ -88,6 +88,18 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}, nil
 }
 
+// Exists checks if an image already exists in vSphere
+func (c *Client) Exists(ctx context.Context, name string) (bool, error) {
+	// TODO
+	return true, nil
+}
+
+// Delete deletes an image from vSphere
+func (c *Client) Delete(ctx context.Context, name string) error {
+	// TODO
+	return nil
+}
+
 // Import imports an OVF image to vSphere
 func (c *Client) Import(ctx context.Context, imageURL string, imageName string) (*types.ManagedObjectReference, error) {
 	log := log.FromContext(ctx)

@@ -18,6 +18,7 @@ import (
 type Client struct {
 	s3         s3.Client
 	bucketName string
+	region     string
 	timeout    time.Duration
 }
 
@@ -43,6 +44,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		s3:         *client,
 		bucketName: c.BucketName,
 		timeout:    c.Timeout,
+		region:     c.Region,
 	}, nil
 }
 
@@ -96,4 +98,9 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 
 	log.Info("Completed download of image from S3", "imageKey", imageKey, "localFilePath", localFilePath)
 	return localFilePath, nil
+}
+
+// GetURL returns the URL of an image in S3
+func (c *Client) GetURL(imageKey string) string {
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucketName, c.region, imageKey)
 }

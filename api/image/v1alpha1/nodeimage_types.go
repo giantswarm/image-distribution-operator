@@ -34,6 +34,18 @@ type NodeImageSpec struct {
 	Provider string `json:"provider"`
 }
 
+// NodeImageState is the state of the image
+type NodeImageState string
+
+const (
+	NodeImagePending   NodeImageState = "Pending"
+	NodeImageUploading NodeImageState = "Uploading"
+	NodeImageAvailable NodeImageState = "Available"
+	NodeImageError     NodeImageState = "Error"
+	NodeImageDeleting  NodeImageState = "Deleting"
+	NodeImageDeleted   NodeImageState = "Deleted"
+)
+
 // NodeImageStatus defines the observed state of NodeImage.
 type NodeImageStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
@@ -43,7 +55,7 @@ type NodeImageStatus struct {
 	Releases []string `json:"releases"`
 
 	// State is the state that the image is currently in
-	State string `json:"state"`
+	State NodeImageState `json:"state"`
 }
 
 // +kubebuilder:object:root=true

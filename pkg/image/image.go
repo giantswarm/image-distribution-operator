@@ -109,3 +109,7 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 
 	return releases.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
 }
+
+func GetImageKey(nodeImage *images.NodeImage) string {
+	return fmt.Sprintf("%s/%s-gs/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, nodeImage.Spec.Name)
+}
