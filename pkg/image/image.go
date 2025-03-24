@@ -113,7 +113,10 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 }
 
 func GetImageKey(nodeImage *images.NodeImage) string {
-	return fmt.Sprintf("%s/%s-gs/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, nodeImage.Spec.Name)
+	// the image name is like "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
+	// the ova file name is like "flatcar-stable-3975.2.0-kube-v1.30.4.ova"
+	ovaFileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
+	return fmt.Sprintf("%s/%s-gs/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, ovaFileName)
 }
 
 func getProviderFromProviderName(providerName string) string {
