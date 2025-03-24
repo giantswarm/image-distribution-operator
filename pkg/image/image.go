@@ -24,7 +24,7 @@ func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (
 
 	provider := getProviderFromProviderName(providerName)
 
-	return GetNodeImage(imageName, providerName, release.Name), nil
+	return GetNodeImage(imageName, provider, release.Name), nil
 }
 
 func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage {
