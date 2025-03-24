@@ -21,6 +21,7 @@ import (
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
+	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +36,8 @@ const (
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	S3Client *s3.Client
+	S3Client      *s3.Client
+	VsphereClient *vsphere.Client
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
