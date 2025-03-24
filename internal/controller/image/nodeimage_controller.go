@@ -78,6 +78,8 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				}
 				return ctrl.Result{}, err
 			}
+		case "test":
+			log.Info("Test provider does not need to be deleted", "provider", nodeImage.Spec.Provider)
 		default:
 			log.Info("Provider not supported", "provider", nodeImage.Spec.Provider)
 		}
@@ -120,6 +122,8 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 			return ctrl.Result{}, err
 		}
+	case "test":
+		log.Info("Test provider does not need to be created", "provider", nodeImage.Spec.Provider)
 	default:
 		log.Info("Provider not supported", "provider", nodeImage.Spec.Provider)
 	}

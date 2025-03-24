@@ -319,5 +319,5 @@ func (c *Client) getNetwork(ctx context.Context, n string, finder *find.Finder) 
 }
 
 func (c *Client) GetVMPath(name string) string {
-	return fmt.Sprintf("%s/vm/%s/%s", c.datacenter, c.folder, name)
+	return fmt.Sprintf("%s/%s", c.folder, name)
 }

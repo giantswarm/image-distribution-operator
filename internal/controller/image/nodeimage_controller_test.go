@@ -41,7 +41,19 @@ var _ = Describe("NodeImage Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		nodeimage := &imagev1alpha1.NodeImage{}
+		nodeimage := &imagev1alpha1.NodeImage{
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     resourceName,
+				Provider: "test",
+			},
+		}
+
+		s3Client, err := s3.New(s3.Config{
+			BucketName: "test-bucket",
+			Region:     "test-region",
+			Timeout:    10,
+		}, ctx)
+		Expect(err).NotTo(HaveOccurred())
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind NodeImage")
@@ -71,7 +83,7 @@ var _ = Describe("NodeImage Controller", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &NodeImageReconciler{
 				Client:   k8sClient,
-				S3Client: &s3.Client{},
+				S3Client: s3Client,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
