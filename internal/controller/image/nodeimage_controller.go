@@ -73,7 +73,9 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		switch nodeImage.Spec.Provider {
 		case ProviderVsphere:
 			if err := r.DeleteVsphere(ctx, nodeImage); err != nil {
-				r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError) // nolint:errcheck
+				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
+				}
 				return ctrl.Result{}, err
 			}
 		default:
@@ -113,7 +115,9 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	switch nodeImage.Spec.Provider {
 	case ProviderVsphere:
 		if err := r.CreateVsphere(ctx, nodeImage, url); err != nil {
-			r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError) // nolint:errcheck
+			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
+			}
 			return ctrl.Result{}, err
 		}
 	default:
@@ -166,16 +170,6 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) error {
 	log := log.FromContext(ctx)
 
-	// check if the image is already deleted
-	if exists, err := r.VsphereClient.Exists(ctx, nodeImage.Spec.Name); err != nil {
-		return fmt.Errorf("failed to check if image exists: %w", err)
-	} else if !exists {
-		// set the status
-		return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageDeleted)
-	}
-
-	log.Info("Node image found, deleting", "nodeImage", nodeImage.Name)
-
 	// set the status
 	if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageDeleting); err != nil {
 		return err
@@ -220,11 +214,25 @@ func ValidURL(url string) error {
 	if url == "" {
 		return fmt.Errorf("URL is empty")
 	}
-	resp, err := http.Head(url)
+
+	// Check that the URL is an s3 bucket
+	if !s3.IsS3URL(url) {
+		return fmt.Errorf("URL is not an S3 bucket")
+	}
+
+	resp, err := http.Head(url) // #nosec G107
 	if err != nil {
 		return fmt.Errorf("error checking URL: %w", err)
 	}
-	defer resp.Body.Close()
+
+	// Ensure resp.Body is closed safely
+	defer func() {
+		if resp.Body != nil {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Failed to close response body: %v", err)
+			}
+		}
+	}()
 
 	// HTTP 200-299 means the file exists
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {

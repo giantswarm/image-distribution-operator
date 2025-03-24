@@ -134,6 +134,11 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
+	// If the State is empty, set it to Available
+	if object.Status.State == "" {
+		object.Status.State = images.NodeImageAvailable
+	}
+
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
 	return i.Client.Status().Update(ctx, object)
 }

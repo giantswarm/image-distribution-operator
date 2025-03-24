@@ -90,13 +90,51 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 // Exists checks if an image already exists in vSphere
 func (c *Client) Exists(ctx context.Context, name string) (bool, error) {
-	// TODO
+	finder := find.NewFinder(c.vsphere.Client, true)
+
+	dc, err := c.getDatacenter(ctx, finder)
+	if err != nil {
+		return false, fmt.Errorf("failed to get datacenter: %w", err)
+	}
+	finder.SetDatacenter(dc)
+
+	_, err = finder.VirtualMachine(ctx, c.GetVMPath(name))
+	if err != nil {
+		return false, nil
+	}
 	return true, nil
 }
 
 // Delete deletes an image from vSphere
 func (c *Client) Delete(ctx context.Context, name string) error {
-	// TODO
+	log := log.FromContext(ctx)
+
+	finder := find.NewFinder(c.vsphere.Client, true)
+
+	dc, err := c.getDatacenter(ctx, finder)
+	if err != nil {
+		return fmt.Errorf("failed to get datacenter: %w", err)
+	}
+	finder.SetDatacenter(dc)
+
+	vm, err := finder.VirtualMachine(ctx, c.GetVMPath(name))
+	if err != nil {
+		// If the VM doesn't exist, return nil
+		return nil
+	}
+
+	task, err := vm.Destroy(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to destroy VM %s: %w", name, err)
+	}
+
+	err = task.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to wait for task: %w", err)
+	}
+
+	log.Info("Deleted VM", "name", name)
+
 	return nil
 }
 
@@ -278,4 +316,8 @@ func (c *Client) getNetwork(ctx context.Context, n string, finder *find.Finder) 
 		network = networks[0]
 	}
 	return network.Reference(), nil
+}
+
+func (c *Client) GetVMPath(name string) string {
+	return fmt.Sprintf("%s/vm/%s/%s", c.datacenter, c.folder, name)
 }
