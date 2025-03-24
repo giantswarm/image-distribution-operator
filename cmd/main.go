@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -77,20 +78,21 @@ func main() {
 	var s3TimeoutSeconds int
 
 	var vsphereVcenterURL, vsphereUsername, vspherePassword string
-	var vsphereDatacenter, vsphereDatastore, vsphereFolder, vsphereHost, vsphereResourcePool string
+	var vsphereDatacenter, vsphereDatastore, vsphereFolder, vsphereHost, vsphereCluster, vsphereResourcePool string
 
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
-	flag.StringVar(&vsphereVcenterURL, "vsphere-vcenter-url", "", "The URL of the vCenter")
-	flag.StringVar(&vsphereUsername, "vsphere-username", "", "The username for the vCenter")
-	flag.StringVar(&vspherePassword, "vsphere-password", "", "The password for the vCenter")
-	flag.StringVar(&vsphereDatacenter, "vsphere-datacenter", "", "The datacenter in the vCenter")
-	flag.StringVar(&vsphereDatastore, "vsphere-datastore", "", "The datastore in the vCenter")
-	flag.StringVar(&vsphereFolder, "vsphere-folder", "", "The folder in the vCenter")
-	flag.StringVar(&vsphereHost, "vsphere-host", "", "The host in the vCenter")
-	flag.StringVar(&vsphereResourcePool, "vsphere-resource-pool", "", "The resource pool in the vCenter")
+	flag.StringVar(&vsphereVcenterURL, "vsphere-vcenter-url", "", "The URL of the vCenter server")
+	flag.StringVar(&vsphereUsername, "vsphere-username", "", "The username for vCenter")
+	flag.StringVar(&vspherePassword, "vsphere-password", "", "The password for vCenter")
+	flag.StringVar(&vsphereDatacenter, "vsphere-datacenter", "", "The datacenter in vCenter")
+	flag.StringVar(&vsphereDatastore, "vsphere-datastore", "", "The datastore in vCenter")
+	flag.StringVar(&vsphereFolder, "vsphere-folder", "", "The VM folder in vCenter")
+	flag.StringVar(&vsphereHost, "vsphere-host", "", "The vSphere host in vCenter")
+	flag.StringVar(&vsphereCluster, "vsphere-cluster", "", "The vSphere cluster in vCenter")
+	flag.StringVar(&vsphereResourcePool, "vsphere-resource-pool", "Resources", "(optional) The resource pool in vCenter")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -248,7 +250,7 @@ func main() {
 		Datastore:    vsphereDatastore,
 		Folder:       vsphereFolder,
 		Host:         vsphereHost,
-		ResourcePool: vsphereResourcePool,
+		ResourcePool: fmt.Sprintf("/%s/host/%s/%s", vsphereDatacenter, vsphereCluster, vsphereResourcePool),
 	}, context.Background())
 	if err != nil {
 		setupLog.Error(err, "unable to create vSphere client")
