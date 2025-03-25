@@ -13,6 +13,7 @@ require (
 	github.com/onsi/gomega v1.35.1
 	github.com/stretchr/testify v1.10.0
 	github.com/vmware/govmomi v0.49.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.32.0
 	k8s.io/client-go v0.32.0
 	sigs.k8s.io/controller-runtime v0.20.0

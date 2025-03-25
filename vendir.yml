@@ -12,3 +12,5 @@ directories:
         - Chart.yaml
         - templates/manager/manager.yaml
         - templates/network-policy/network-policy.yaml
+        - templates/vsphere/credentials.yaml
+        - templates/vsphere/locations.yaml

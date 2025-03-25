@@ -4,40 +4,38 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf/importer"
 	"github.com/vmware/govmomi/vim25/types"
+	"gopkg.in/yaml.v2"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Client wraps the govmomi client
 type Client struct {
-	vsphere      *govmomi.Client
-	url          string
-	datacenter   string
-	datastore    string
-	username     string
-	password     string
-	folder       string
-	host         string
-	resourcepool string
-	network      string
+	vsphere   *govmomi.Client
+	url       string
+	Locations map[string]*Location
+}
+
+type Location struct {
+	datacenter   string `yaml:"datacenter"`
+	datastore    string `yaml:"datastore"`
+	folder       string `yaml:"folder"`
+	host         string `yaml:"host"`
+	resourcepool string `yaml:"resourcepool"`
+	network      string `yaml:"network"`
+	cluster      string `yaml:"cluster"`
 }
 
 // Config holds the configuration for the vSphere client
 type Config struct {
-	URL          string
-	Username     string
-	Password     string
-	Datacenter   string
-	Datastore    string
-	Folder       string
-	Host         string
-	ResourcePool string
-	Network      string
+	CredentialsFile string
+	LocationsFile   string
 }
 
 // ImporterConfig holds the configuration for the OVF importer
@@ -57,12 +55,17 @@ type ImporterConfig struct {
 func New(c Config, ctx context.Context) (*Client, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("Connecting to vSphere", "vSphereURL", c.URL)
+	vcenter, username, password, err := LoadCredentials(c.CredentialsFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load credentials:\n%w", err)
+	}
+
+	log.Info("Connecting to vSphere", "vSphereURL", vcenter)
 
 	u, err := url.Parse(fmt.Sprintf("https://%s:%s@%s/sdk",
-		c.Username,
-		c.Password,
-		c.URL,
+		username,
+		password,
+		vcenter,
 	))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vSphere URL:\n%w", err)
@@ -73,32 +76,31 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("failed to create vSphere client:\n%w", err)
 	}
 
-	log.Info("Successfully connected to vSphere", "vSphereURL", c.URL)
+	log.Info("Successfully connected to vSphere", "vSphereURL", vcenter)
+
+	locations, err := LoadLocations(c.LocationsFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load locations file:\n%w", err)
+	}
 
 	return &Client{
-		vsphere:      client,
-		url:          c.URL,
-		datacenter:   c.Datacenter,
-		datastore:    c.Datastore,
-		username:     c.Username,
-		password:     c.Password,
-		folder:       c.Folder,
-		host:         c.Host,
-		resourcepool: c.ResourcePool,
+		vsphere:   client,
+		url:       vcenter,
+		Locations: locations,
 	}, nil
 }
 
 // Exists checks if an image already exists in vSphere
-func (c *Client) Exists(ctx context.Context, name string) (bool, error) {
+func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, error) {
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	dc, err := c.getDatacenter(ctx, finder)
+	dc, err := c.getDatacenter(ctx, finder, loc)
 	if err != nil {
 		return false, fmt.Errorf("failed to get datacenter: %w", err)
 	}
 	finder.SetDatacenter(dc)
 
-	_, err = finder.VirtualMachine(ctx, c.GetVMPath(name))
+	_, err = finder.VirtualMachine(ctx, c.GetVMPath(name, loc))
 	if err != nil {
 		return false, nil
 	}
@@ -106,18 +108,18 @@ func (c *Client) Exists(ctx context.Context, name string) (bool, error) {
 }
 
 // Delete deletes an image from vSphere
-func (c *Client) Delete(ctx context.Context, name string) error {
+func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 	log := log.FromContext(ctx)
 
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	dc, err := c.getDatacenter(ctx, finder)
+	dc, err := c.getDatacenter(ctx, finder, loc)
 	if err != nil {
 		return fmt.Errorf("failed to get datacenter: %w", err)
 	}
 	finder.SetDatacenter(dc)
 
-	vm, err := finder.VirtualMachine(ctx, c.GetVMPath(name))
+	vm, err := finder.VirtualMachine(ctx, c.GetVMPath(name, loc))
 	if err != nil {
 		// If the VM doesn't exist, return nil
 		return nil
@@ -139,38 +141,38 @@ func (c *Client) Delete(ctx context.Context, name string) error {
 }
 
 // Import imports an OVF image to vSphere
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string) (*types.ManagedObjectReference, error) {
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (*types.ManagedObjectReference, error) {
 	log := log.FromContext(ctx)
 
 	finder := find.NewFinder(c.vsphere.Client, true)
 
-	dc, err := c.getDatacenter(ctx, finder)
+	dc, err := c.getDatacenter(ctx, finder, loc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datacenter: %w", err)
 	}
 	finder.SetDatacenter(dc)
 
-	datastore, err := c.getDatastore(ctx, finder)
+	datastore, err := c.getDatastore(ctx, finder, loc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datastore: %w", err)
 	}
 
-	folder, err := c.getFolder(ctx, c.folder, finder)
+	folder, err := c.getFolder(ctx, c.Locations[loc].folder, finder, loc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
-	pool, err := c.getResourcePool(ctx, c.resourcepool, finder)
+	pool, err := c.getResourcePool(ctx, c.Locations[loc].resourcepool, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
-	host, err := c.getHost(ctx, c.host, finder)
+	host, err := c.getHost(ctx, c.Locations[loc].host, finder, loc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
-	network, err := c.getNetwork(ctx, c.network, finder)
+	network, err := c.getNetwork(ctx, c.Locations[loc].network, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network: %w", err)
 	}
@@ -238,25 +240,25 @@ func (c *Client) getImporter(config ImporterConfig) *importer.Importer {
 }
 
 // getDatacenter returns the datacenter object
-func (c *Client) getDatacenter(ctx context.Context, finder *find.Finder) (*object.Datacenter, error) {
-	dc, err := finder.DatacenterOrDefault(ctx, c.datacenter)
+func (c *Client) getDatacenter(ctx context.Context, finder *find.Finder, loc string) (*object.Datacenter, error) {
+	dc, err := finder.DatacenterOrDefault(ctx, c.Locations[loc].datacenter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.datacenter, err)
+		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.Locations[loc].datacenter, err)
 	}
 	return dc, nil
 }
 
 // getDatastore returns the datastore object
-func (c *Client) getDatastore(ctx context.Context, finder *find.Finder) (*object.Datastore, error) {
-	datastore, err := finder.DatastoreOrDefault(ctx, c.datastore)
+func (c *Client) getDatastore(ctx context.Context, finder *find.Finder, loc string) (*object.Datastore, error) {
+	datastore, err := finder.DatastoreOrDefault(ctx, c.Locations[loc].datastore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find datastore %s: %w", c.datastore, err)
+		return nil, fmt.Errorf("failed to find datastore %s: %w", c.Locations[loc].datastore, err)
 	}
 	return datastore, nil
 }
 
 // getFolder returns the folder object
-func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Finder) (*object.Folder, error) {
+func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Finder, loc string) (*object.Folder, error) {
 	folderObj, err := finder.FolderOrDefault(ctx, folder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
@@ -265,7 +267,7 @@ func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Find
 }
 
 // getHost returns the host object
-func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
+func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder, loc string) (*object.HostSystem, error) {
 	var host *object.HostSystem
 	var err error
 	if hostName != "" {
@@ -318,6 +320,58 @@ func (c *Client) getNetwork(ctx context.Context, n string, finder *find.Finder) 
 	return network.Reference(), nil
 }
 
-func (c *Client) GetVMPath(name string) string {
-	return fmt.Sprintf("%s/%s", c.folder, name)
+func (c *Client) GetVMPath(name string, loc string) string {
+	return fmt.Sprintf("%s/%s", c.Locations[loc].folder, name)
+}
+
+func LoadLocations(path string) (map[string]*Location, error) {
+	locations := make(map[string]*Location)
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read locations file:\n%w", err)
+	}
+
+	if err := yaml.Unmarshal(file, locations); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal locations file:\n%w", err)
+	}
+
+	for k, v := range locations {
+		if v.datacenter == "" {
+			return nil, fmt.Errorf("datacenter is required for location %s", k)
+		}
+		if v.datastore == "" {
+			return nil, fmt.Errorf("datastore is required for location %s", k)
+		}
+		if v.folder == "" {
+			return nil, fmt.Errorf("folder is required for location %s", k)
+		}
+		if v.cluster == "" {
+			return nil, fmt.Errorf("cluster is required for location %s", k)
+		}
+		if v.resourcepool == "" {
+			return nil, fmt.Errorf("resourcepool is required for location %s", k)
+		}
+		locations[k].resourcepool = fmt.Sprintf("/%s/host/%s/%s", v.datacenter, v.cluster, v.resourcepool)
+	}
+	return locations, nil
+}
+
+func LoadCredentials(path string) (string, string, string, error) {
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to read credentials file:\n%w", err)
+	}
+
+	var creds struct {
+		vCenter  string `yaml:"vcenter"`
+		username string `yaml:"username"`
+		password string `yaml:"password"`
+	}
+
+	if err := yaml.Unmarshal(file, &creds); err != nil {
+		return "", "", "", fmt.Errorf("failed to unmarshal credentials file:\n%w", err)
+	}
+
+	return creds.vCenter, creds.username, creds.password, nil
 }

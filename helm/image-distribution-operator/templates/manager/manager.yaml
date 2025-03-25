@@ -31,6 +31,8 @@ spec:
             {{- range .Values.controllerManager.container.args }}
             - {{ . }}
             {{- end }}
+            --s3-bucket={{ .Values.s3.bucket }}
+            --s3-region={{ .Values.s3.region }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"
@@ -57,6 +59,10 @@ spec:
           volumeMounts:
             - mountPath: /tmp/images
               name: image-storage
+            - mountPath: /home/.vsphere/credentials
+              name: credentials
+            - mountPath: /home/.vsphere/locations
+              name: locations
             {{- if and .Values.metrics.enable .Values.certmanager.enable }}
             - name: metrics-certs
               mountPath: /tmp/k8s-metrics-server/metrics-certs
@@ -71,6 +77,12 @@ spec:
       volumes:
         - name: image-storage
           emptyDir: {}
+        - name: credentials
+          secret:
+            secretName: image-distribution-operator-vsphere-credentials
+        - name: locations
+          configMap:
+            name: image-distribution-operator-vsphere-locations
         {{- if and .Values.metrics.enable .Values.certmanager.enable }}
         - name: metrics-certs
           secret:

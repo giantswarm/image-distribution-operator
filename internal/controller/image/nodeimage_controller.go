@@ -73,11 +73,13 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		switch nodeImage.Spec.Provider {
 		case ProviderVsphere:
-			if err := r.DeleteVsphere(ctx, nodeImage); err != nil {
-				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
+			for loc, _ := range r.VsphereClient.Locations {
+				if err := r.DeleteVsphere(ctx, nodeImage, loc); err != nil {
+					if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+						return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
+					}
+					return ctrl.Result{}, err
 				}
-				return ctrl.Result{}, err
 			}
 		case "test":
 			log.Info("Test provider does not need to be deleted", "provider", nodeImage.Spec.Provider)
@@ -109,19 +111,20 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	imageKey := image.GetImageKey(nodeImage)
 	url := r.S3Client.GetURL(imageKey)
 
-	// Check if the url is valid
-	if err := ValidURL(url); err != nil {
-		log.Info("Invalid URL", "url", url)
-		return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
-	}
-
 	switch nodeImage.Spec.Provider {
 	case ProviderVsphere:
-		if err := r.CreateVsphere(ctx, nodeImage, url); err != nil {
-			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
+		// Check if the url is valid
+		if err := ValidURL(url); err != nil {
+			log.Info("Invalid URL", "url", url)
+			return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
+		}
+		for loc, _ := range r.VsphereClient.Locations {
+			if err := r.CreateVsphere(ctx, nodeImage, url, loc); err != nil {
+				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
+				}
+				return ctrl.Result{}, err
 			}
-			return ctrl.Result{}, err
 		}
 	case "test":
 		log.Info("Test provider does not need to be created", "provider", nodeImage.Spec.Provider)
@@ -132,18 +135,18 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string) error {
+func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string) error {
 	log := log.FromContext(ctx)
 
 	// check if the image is already uploaded
-	if exists, err := r.VsphereClient.Exists(ctx, nodeImage.Spec.Name); err != nil {
+	if exists, err := r.VsphereClient.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to check if image exists: %w", err)
 	} else if exists {
 		// set the status
 		return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 	}
 
-	log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name)
+	log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name, "location", loc)
 
 	// set the status
 	if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageUploading); err != nil {
@@ -151,12 +154,12 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// import the image
-	object, err := r.VsphereClient.Import(ctx, url, nodeImage.Spec.Name)
+	object, err := r.VsphereClient.Import(ctx, url, nodeImage.Spec.Name, loc)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}
 
-	log.Info("Node image uploaded", "nodeImage", nodeImage.Name)
+	log.Info("Node image uploaded", "nodeImage", nodeImage.Name, "location", loc)
 
 	// process the image
 	err = r.VsphereClient.Process(ctx, *object)
@@ -164,13 +167,13 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 		return fmt.Errorf("failed to process image: %w", err)
 	}
 
-	log.Info("Node image processed", "nodeImage", nodeImage.Name)
+	log.Info("Node image processed", "nodeImage", nodeImage.Name, "location", loc)
 
 	// set the status
 	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 }
 
-func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) error {
+func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string) error {
 	log := log.FromContext(ctx)
 
 	// set the status
@@ -179,11 +182,11 @@ func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// delete the image
-	if err := r.VsphereClient.Delete(ctx, nodeImage.Spec.Name); err != nil {
+	if err := r.VsphereClient.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
 	}
 
-	log.Info("Node image deleted", "nodeImage", nodeImage.Name)
+	log.Info("Node image deleted", "nodeImage", nodeImage.Name, "location", loc)
 
 	// set the status
 	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageDeleted)
