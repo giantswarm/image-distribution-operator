@@ -64,6 +64,12 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
 
+	if release.Spec.State != "active" {
+		// Log that the release is deprecated and skipping it
+		log.Info("Release " + release.Name + " is deprecated - skipping")
+		return ctrl.Result{}, nil
+	}
+
 	nodeImage, err := image.GetNodeImageFromRelease(release, flatcarChannel)
 	if err != nil {
 		return ctrl.Result{}, err
