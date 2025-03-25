@@ -140,9 +140,7 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 		return fmt.Errorf("failed to check if image exists: %w", err)
 	} else if exists {
 		// set the status
-		if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable); err != nil {
-			return err
-		}
+		return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 	}
 
 	log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name)
