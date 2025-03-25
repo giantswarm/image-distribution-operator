@@ -71,7 +71,7 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 	}
 	// Update the object
 	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Update(ctx, object)
+	return i.Client.Status().Update(ctx, object)
 }
 
 func (i *Client) DeleteImage(ctx context.Context, image string) error {
