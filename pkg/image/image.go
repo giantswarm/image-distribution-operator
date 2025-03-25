@@ -92,7 +92,7 @@ func getImageProvider(release string) (string, error) {
 // taken from github.com/giantswarm/capi-image-builder
 func buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion string) string {
 	return fmt.Sprintf(
-		"flatcar-%s-%s-kube-%s-tooling-%s",
+		"flatcar-%s-%s-kube-%s-tooling-%s-gs",
 		flatcarChannel,
 		flatcarVersion,
 		strings.TrimPrefix(kubernetesVersion, "v"),
@@ -118,7 +118,7 @@ func GetImageKey(nodeImage *images.NodeImage) string {
 	ovaFileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
 	regexp := regexp.MustCompile(`(kube-)(\d+\.\d+\.\d+)`)
 	ovaFileName = regexp.ReplaceAllString(ovaFileName, `${1}v${2}`)
-	return fmt.Sprintf("%s/%s-gs/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, ovaFileName)
+	return fmt.Sprintf("%s/%s/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, ovaFileName)
 }
 
 func getProviderFromProviderName(providerName string) string {
@@ -126,6 +126,6 @@ func getProviderFromProviderName(providerName string) string {
 	case "vsphere":
 		return "capv"
 	default:
-		return "unknown"
+		return providerName
 	}
 }

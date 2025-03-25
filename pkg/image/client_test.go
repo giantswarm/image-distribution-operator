@@ -63,7 +63,10 @@ func TestRemoveImage(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 
-				fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
+				fakeClient = fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithStatusSubresource(&images.NodeImage{}).
+					Build()
 			}
 
 			if tc.existingImage != nil {
