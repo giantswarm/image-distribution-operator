@@ -78,26 +78,10 @@ networkPolicy:
 
 vsphere:
   credentials:
-    username: test
-    password: test
-    vcenter: test
-  locations: 
-    test:
-      datacenter: test
-      datastore: test
-      network: test
-      resourcepool: test
-      server: test
-      username: test
-      password: test
-    other:
-      datacenter: other
-      datastore: other
-      network: other
-      resourcepool: other
-      server: other
-      username: other
-      password: other
+    username: ""
+    password: ""
+    vcenter: ""
+  locations: {}
 s3:
   bucket: ""
   region: ""
