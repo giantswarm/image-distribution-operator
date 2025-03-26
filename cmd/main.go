@@ -83,8 +83,10 @@ func main() {
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
-	flag.StringVar(&vsphereCredentials, "vsphere-credentials", "/home/.vsphere/credentials", "The file containing the credentials for vSphere resources.")
-	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations", "The file containing the locations for vSphere resources")
+	flag.StringVar(&vsphereCredentials, "vsphere-credentials", "/home/.vsphere/credentials",
+		"The file containing the credentials for vSphere resources.")
+	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations",
+		"The file containing the locations for vSphere resources")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")

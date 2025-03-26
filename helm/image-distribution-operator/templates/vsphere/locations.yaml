@@ -7,4 +7,4 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   locations.yaml: |-
-    {{ .Values.vsphere.locations | toYaml | nindent 6 }}
+    {{- .Values.vsphere.locations | toYaml | nindent 4 }}

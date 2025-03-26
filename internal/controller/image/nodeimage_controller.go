@@ -73,7 +73,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		switch nodeImage.Spec.Provider {
 		case ProviderVsphere:
-			for loc, _ := range r.VsphereClient.Locations {
+			for loc := range r.VsphereClient.Locations {
 				if err := r.DeleteVsphere(ctx, nodeImage, loc); err != nil {
 					if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 						return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
@@ -118,7 +118,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Info("Invalid URL", "url", url)
 			return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
 		}
-		for loc, _ := range r.VsphereClient.Locations {
+		for loc := range r.VsphereClient.Locations {
 			if err := r.CreateVsphere(ctx, nodeImage, url, loc); err != nil {
 				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)

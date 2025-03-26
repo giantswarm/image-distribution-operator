@@ -141,7 +141,9 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 }
 
 // Import imports an OVF image to vSphere
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (*types.ManagedObjectReference, error) {
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (
+	*types.ManagedObjectReference, error) {
+
 	log := log.FromContext(ctx)
 
 	finder := find.NewFinder(c.vsphere.Client, true)
@@ -258,23 +260,23 @@ func (c *Client) getDatastore(ctx context.Context, finder *find.Finder, loc stri
 }
 
 // getFolder returns the folder object
-func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Finder, loc string) (*object.Folder, error) {
-	folderObj, err := finder.FolderOrDefault(ctx, folder)
+func (c *Client) getFolder(ctx context.Context, f string, finder *find.Finder, loc string) (*object.Folder, error) {
+	folderObj, err := finder.FolderOrDefault(ctx, f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
+		return nil, fmt.Errorf("failed to find folder %s: %w", f, err)
 	}
 	return folderObj, nil
 }
 
 // getHost returns the host object
-func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder, loc string) (*object.HostSystem, error) {
+func (c *Client) getHost(ctx context.Context, h string, finder *find.Finder, loc string) (*object.HostSystem, error) {
 	var host *object.HostSystem
 	var err error
-	if hostName != "" {
-		host, err = finder.HostSystemOrDefault(ctx, hostName)
+	if h != "" {
+		host, err = finder.HostSystemOrDefault(ctx, h)
 		fmt.Printf("%v", host)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
+			return nil, fmt.Errorf("failed to find host %s: %w", h, err)
 		}
 	} else {
 		hosts, err := finder.HostSystemList(ctx, "*") // Get all hosts
@@ -327,7 +329,7 @@ func (c *Client) GetVMPath(name string, loc string) string {
 func LoadLocations(path string) (map[string]*Location, error) {
 	locations := make(map[string]*Location)
 
-	file, err := os.ReadFile(path)
+	file, err := os.ReadFile(path) // nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read locations file:\n%w", err)
 	}
@@ -358,7 +360,7 @@ func LoadLocations(path string) (map[string]*Location, error) {
 }
 
 func LoadCredentials(path string) (string, string, string, error) {
-	file, err := os.ReadFile(path)
+	file, err := os.ReadFile(path) // nolint:gosec
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to read credentials file:\n%w", err)
 	}
