@@ -6,5 +6,5 @@ metadata:
   name: image-distribution-operator-vsphere-locations
   namespace: {{ .Release.Namespace }}
 data:
-  locations.yaml: |-
+  locations: |-
     {{- .Values.vsphere.locations | toYaml | nindent 4 }}
