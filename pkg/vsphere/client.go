@@ -351,9 +351,6 @@ func LoadLocations(path string) (map[string]*Location, error) {
 		if v.Cluster == "" {
 			return nil, fmt.Errorf("cluster is required for location %s", k)
 		}
-		if v.Resourcepool == "" {
-			return nil, fmt.Errorf("resourcepool is required for location %s", k)
-		}
 		locations[k].Resourcepool = fmt.Sprintf("/%s/host/%s/%s", v.Datacenter, v.Cluster, v.Resourcepool)
 	}
 	return locations, nil
