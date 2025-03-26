@@ -17,7 +17,48 @@ If a release is deleted, the `NodeImage` Status is updated to remove the release
 If a `NodeImage` is no longer needed, it is deleted.
 
 ### `image-controller`
-TODO
+The `image-controller` watches `NodeImage` custom resources on the workload clusters.
+For each `NodeImage` that is created, it will ensure that the image is available inside the provider image catalog.
+The current state of the image is stored in the `NodeImage` Status. (e.g. `Available`, `Uploading`)
+If the image is not available, the controller will attempt to upload the image to the provider image catalogs.
+If the image is available, the controller will update the `NodeImage` Status to `Available`.
+If the `NodeImage` is deleted, the controller will remove the image from the provider image catalogs.
+
+### AWS S3 Client
+The `image-controller` imports images from a public S3 bucket.
+The bucket is specified inside the `values.yaml` file.
+
+```yaml
+s3:
+  bucket: "my-bucket"
+  region: "us-west-2"
+```
+
+### Vsphere Client
+The `image-controller` can upload images to one or more locations inside a VCenter.
+The VCenter credentials and locations are specified inside the `values.yaml` file.
+
+```yaml
+vsphere:
+  credentials:
+    username: "my-username"
+    password: "my-password"
+    vcenter: "my-vcenter"
+  locations:
+    location1:
+      datacenter: "my-datacenter"
+      datastore: "my-datastore"
+      cluster: "my-cluster"
+      folder: "my-folder"
+    location2:
+      datacenter: "another-datacenter"
+      datastore: "another-datastore"
+      cluster: "another-cluster"
+      folder: "another-folder"
+      resourcepool: "my-resourcepool" # Optional
+      host: "my-host" # Optional
+      network: "my-network" # Optional
+```
 
 ## Getting Started
 

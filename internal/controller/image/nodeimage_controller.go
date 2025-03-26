@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
@@ -111,14 +110,23 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	imageKey := image.GetImageKey(nodeImage)
 	url := r.S3Client.GetURL(imageKey)
 
+	// Check if the url is valid
+	if err := ValidURL(url); err != nil {
+		log.Info("Invalid URL", "url", url)
+		return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
+	}
+
 	switch nodeImage.Spec.Provider {
 	case ProviderVsphere:
-		// Check if the url is valid
-		if err := ValidURL(url); err != nil {
-			log.Info("Invalid URL", "url", url)
-			return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
-		}
 		for loc := range r.VsphereClient.Locations {
+			// check if the image is available
+			if err := ImageAvailable(url); err != nil {
+				log.Info("Image not available on S3 - marking as deprecated", "url", url, "response", err)
+				if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageDeprecated); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
+				}
+				return ctrl.Result{}, nil
+			}
 			if err := r.CreateVsphere(ctx, nodeImage, url, loc); err != nil {
 				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
@@ -225,11 +233,10 @@ func ValidURL(url string) error {
 	if !s3.IsS3URL(url) {
 		return fmt.Errorf("URL is not an S3 bucket")
 	}
+	return nil
+}
 
-	if strings.HasPrefix(url, "https://test-bucket.s3.") {
-		return nil
-	}
-
+func ImageAvailable(url string) error {
 	resp, err := http.Head(url) // #nosec G107
 	if err != nil {
 		return fmt.Errorf("error checking URL: %w", err)
