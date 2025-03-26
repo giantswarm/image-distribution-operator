@@ -159,7 +159,7 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 		return nil, fmt.Errorf("failed to get datastore: %w", err)
 	}
 
-	folder, err := c.getFolder(ctx, c.Locations[loc].folder, finder, loc)
+	folder, err := c.getFolder(ctx, c.Locations[loc].folder, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
@@ -169,7 +169,7 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
-	host, err := c.getHost(ctx, c.Locations[loc].host, finder, loc)
+	host, err := c.getHost(ctx, c.Locations[loc].host, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
@@ -260,23 +260,23 @@ func (c *Client) getDatastore(ctx context.Context, finder *find.Finder, loc stri
 }
 
 // getFolder returns the folder object
-func (c *Client) getFolder(ctx context.Context, f string, finder *find.Finder, loc string) (*object.Folder, error) {
-	folderObj, err := finder.FolderOrDefault(ctx, f)
+func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Finder) (*object.Folder, error) {
+	folderObj, err := finder.FolderOrDefault(ctx, folder)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find folder %s: %w", f, err)
+		return nil, fmt.Errorf("failed to find folder %s: %w", folder, err)
 	}
 	return folderObj, nil
 }
 
 // getHost returns the host object
-func (c *Client) getHost(ctx context.Context, h string, finder *find.Finder, loc string) (*object.HostSystem, error) {
+func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
 	var host *object.HostSystem
 	var err error
-	if h != "" {
-		host, err = finder.HostSystemOrDefault(ctx, h)
+	if hostName != "" {
+		host, err = finder.HostSystemOrDefault(ctx, hostName)
 		fmt.Printf("%v", host)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find host %s: %w", h, err)
+			return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
 		}
 	} else {
 		hosts, err := finder.HostSystemList(ctx, "*") // Get all hosts
