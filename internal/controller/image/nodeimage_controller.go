@@ -121,8 +121,8 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		for loc := range r.VsphereClient.Locations {
 			// check if the image is available
 			if err := ImageAvailable(url); err != nil {
-				log.Info("Image not available on S3 - marking as deprecated", "url", url, "response", err)
-				if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageDeprecated); err != nil {
+				log.Info("Image not available on S3 - marking as missing", "url", url, "response", err)
+				if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageMissing); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 				}
 				return ctrl.Result{}, nil
