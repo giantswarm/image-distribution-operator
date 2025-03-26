@@ -23,13 +23,13 @@ type Client struct {
 }
 
 type Location struct {
-	datacenter   string `yaml:"datacenter"`
-	datastore    string `yaml:"datastore"`
-	folder       string `yaml:"folder"`
-	host         string `yaml:"host"`
-	resourcepool string `yaml:"resourcepool"`
-	network      string `yaml:"network"`
-	cluster      string `yaml:"cluster"`
+	Datacenter   string `yaml:"datacenter"`
+	Datastore    string `yaml:"datastore"`
+	Folder       string `yaml:"folder"`
+	Host         string `yaml:"host"`
+	Resourcepool string `yaml:"resourcepool"`
+	Network      string `yaml:"network"`
+	Cluster      string `yaml:"cluster"`
 }
 
 // Config holds the configuration for the vSphere client
@@ -159,22 +159,22 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 		return nil, fmt.Errorf("failed to get datastore: %w", err)
 	}
 
-	folder, err := c.getFolder(ctx, c.Locations[loc].folder, finder)
+	folder, err := c.getFolder(ctx, c.Locations[loc].Folder, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
-	pool, err := c.getResourcePool(ctx, c.Locations[loc].resourcepool, finder)
+	pool, err := c.getResourcePool(ctx, c.Locations[loc].Resourcepool, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource pool: %w", err)
 	}
 
-	host, err := c.getHost(ctx, c.Locations[loc].host, finder)
+	host, err := c.getHost(ctx, c.Locations[loc].Host, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
-	network, err := c.getNetwork(ctx, c.Locations[loc].network, finder)
+	network, err := c.getNetwork(ctx, c.Locations[loc].Network, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network: %w", err)
 	}
@@ -243,18 +243,18 @@ func (c *Client) getImporter(config ImporterConfig) *importer.Importer {
 
 // getDatacenter returns the datacenter object
 func (c *Client) getDatacenter(ctx context.Context, finder *find.Finder, loc string) (*object.Datacenter, error) {
-	dc, err := finder.DatacenterOrDefault(ctx, c.Locations[loc].datacenter)
+	dc, err := finder.DatacenterOrDefault(ctx, c.Locations[loc].Datacenter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.Locations[loc].datacenter, err)
+		return nil, fmt.Errorf("failed to find datacenter %s:\n%w", c.Locations[loc].Datacenter, err)
 	}
 	return dc, nil
 }
 
 // getDatastore returns the datastore object
 func (c *Client) getDatastore(ctx context.Context, finder *find.Finder, loc string) (*object.Datastore, error) {
-	datastore, err := finder.DatastoreOrDefault(ctx, c.Locations[loc].datastore)
+	datastore, err := finder.DatastoreOrDefault(ctx, c.Locations[loc].Datastore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find datastore %s: %w", c.Locations[loc].datastore, err)
+		return nil, fmt.Errorf("failed to find datastore %s: %w", c.Locations[loc].Datastore, err)
 	}
 	return datastore, nil
 }
@@ -323,7 +323,7 @@ func (c *Client) getNetwork(ctx context.Context, n string, finder *find.Finder) 
 }
 
 func (c *Client) GetVMPath(name string, loc string) string {
-	return fmt.Sprintf("%s/%s", c.Locations[loc].folder, name)
+	return fmt.Sprintf("%s/%s", c.Locations[loc].Folder, name)
 }
 
 func LoadLocations(path string) (map[string]*Location, error) {
@@ -339,22 +339,22 @@ func LoadLocations(path string) (map[string]*Location, error) {
 	}
 
 	for k, v := range locations {
-		if v.datacenter == "" {
+		if v.Datacenter == "" {
 			return nil, fmt.Errorf("datacenter is required for location %s", k)
 		}
-		if v.datastore == "" {
+		if v.Datastore == "" {
 			return nil, fmt.Errorf("datastore is required for location %s", k)
 		}
-		if v.folder == "" {
+		if v.Folder == "" {
 			return nil, fmt.Errorf("folder is required for location %s", k)
 		}
-		if v.cluster == "" {
+		if v.Cluster == "" {
 			return nil, fmt.Errorf("cluster is required for location %s", k)
 		}
-		if v.resourcepool == "" {
+		if v.Resourcepool == "" {
 			return nil, fmt.Errorf("resourcepool is required for location %s", k)
 		}
-		locations[k].resourcepool = fmt.Sprintf("/%s/host/%s/%s", v.datacenter, v.cluster, v.resourcepool)
+		locations[k].Resourcepool = fmt.Sprintf("/%s/host/%s/%s", v.Datacenter, v.Cluster, v.Resourcepool)
 	}
 	return locations, nil
 }
@@ -366,14 +366,14 @@ func LoadCredentials(path string) (string, string, string, error) {
 	}
 
 	var creds struct {
-		vCenter  string `yaml:"vcenter"`
-		username string `yaml:"username"`
-		password string `yaml:"password"`
+		VCenter  string `yaml:"vcenter"`
+		Username string `yaml:"username"`
+		Password string `yaml:"password"`
 	}
 
 	if err := yaml.Unmarshal(file, &creds); err != nil {
 		return "", "", "", fmt.Errorf("failed to unmarshal credentials file:\n%w", err)
 	}
 
-	return creds.vCenter, creds.username, creds.password, nil
+	return creds.VCenter, creds.Username, creds.Password, nil
 }
