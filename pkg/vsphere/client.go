@@ -30,6 +30,7 @@ type Location struct {
 	Resourcepool string `yaml:"resourcepool"`
 	Network      string `yaml:"network"`
 	Cluster      string `yaml:"cluster"`
+	ImageSuffix  string `yaml:"imagesuffix"`
 }
 
 // Config holds the configuration for the vSphere client
@@ -177,6 +178,11 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 	network, err := c.getNetwork(ctx, c.Locations[loc].Network, finder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network: %w", err)
+	}
+
+	imageSuffix := c.Locations[loc].ImageSuffix
+	if len(imageSuffix) > 0 {
+		imageName = fmt.Sprintf("%s-%s", imageName, imageSuffix)
 	}
 
 	options := &importer.Options{
