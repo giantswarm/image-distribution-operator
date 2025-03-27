@@ -58,6 +58,7 @@ vsphere:
       resourcepool: "my-resourcepool" # Optional
       host: "my-host" # Optional
       network: "my-network" # Optional
+      imagesuffix: "my-suffix" # Optional
 ```
 
 ## Getting Started
