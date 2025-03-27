@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,6 +19,7 @@ import (
 type Client struct {
 	s3         s3.Client
 	bucketName string
+	region     string
 	timeout    time.Duration
 }
 
@@ -43,6 +45,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		s3:         *client,
 		bucketName: c.BucketName,
 		timeout:    c.Timeout,
+		region:     c.Region,
 	}, nil
 }
 
@@ -96,4 +99,15 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 
 	log.Info("Completed download of image from S3", "imageKey", imageKey, "localFilePath", localFilePath)
 	return localFilePath, nil
+}
+
+// GetURL returns the URL of an image in S3
+func (c *Client) GetURL(imageKey string) string {
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucketName, c.region, imageKey)
+}
+
+// IsS3URL checks if a URL is an S3 URL
+func IsS3URL(url string) bool {
+	regexp := regexp.MustCompile(`^https://[a-zA-Z0-9-]+\.s3\.[a-z0-9-]+\.amazonaws\.com/.+`)
+	return regexp.MatchString(url)
 }

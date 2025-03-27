@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 )
 
 var _ = Describe("NodeImage Controller", func() {
@@ -42,6 +43,13 @@ var _ = Describe("NodeImage Controller", func() {
 		}
 		nodeimage := &imagev1alpha1.NodeImage{}
 
+		s3Client, err := s3.New(s3.Config{
+			BucketName: "test-bucket",
+			Region:     "test-region",
+			Timeout:    10,
+		}, ctx)
+		Expect(err).NotTo(HaveOccurred())
+
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind NodeImage")
 			err := k8sClient.Get(ctx, typeNamespacedName, nodeimage)
@@ -51,7 +59,10 @@ var _ = Describe("NodeImage Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: imagev1alpha1.NodeImageSpec{
+						Name:     resourceName,
+						Provider: "test",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -69,7 +80,8 @@ var _ = Describe("NodeImage Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &NodeImageReconciler{
-				Client: k8sClient,
+				Client:   k8sClient,
+				S3Client: s3Client,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

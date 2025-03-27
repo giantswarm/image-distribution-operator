@@ -75,3 +75,14 @@ certmanager:
 # [NETWORK POLICIES]: To enable NetworkPolicies set true
 networkPolicy:
   enable: false
+
+vsphere:
+  credentials:
+    username: ""
+    password: ""
+    vcenter: ""
+  locations: {}
+s3:
+  bucket: ""
+  region: ""
+  timeout: ""

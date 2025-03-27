@@ -31,13 +31,14 @@ spec:
             {{- range .Values.controllerManager.container.args }}
             - {{ . }}
             {{- end }}
+            - --s3-bucket={{ .Values.s3.bucket }}
+            - --s3-region={{ .Values.s3.region }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"
           ports:
             - containerPort: 8081
               name: http
-          name: http
           {{- if .Values.controllerManager.container.env }}
           env:
             {{- range $key, $value := .Values.controllerManager.container.env }}
@@ -53,27 +54,35 @@ spec:
             {{- toYaml .Values.controllerManager.container.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.controllerManager.container.securityContext | nindent 12 }}
-          {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
           volumeMounts:
             - mountPath: /tmp/images
               name: image-storage
+            - mountPath: /home/.vsphere/credentials
+              name: credentials
+              subPath: credentials
+            - mountPath: /home/.vsphere/locations
+              name: locations
+              subPath: locations
             {{- if and .Values.metrics.enable .Values.certmanager.enable }}
             - name: metrics-certs
               mountPath: /tmp/k8s-metrics-server/metrics-certs
               readOnly: true
             {{- end }}
-          {{- end }}
       securityContext:
         {{- toYaml .Values.controllerManager.securityContext | nindent 8 }}
       serviceAccountName: {{ .Values.controllerManager.serviceAccountName }}
       terminationGracePeriodSeconds: {{ .Values.controllerManager.terminationGracePeriodSeconds }}
-      {{- if and .Values.certmanager.enable (or .Values.webhook.enable .Values.metrics.enable) }}
       volumes:
         - name: image-storage
           emptyDir: {}
+        - name: credentials
+          secret:
+            secretName: image-distribution-operator-vsphere-credentials
+        - name: locations
+          configMap:
+            name: image-distribution-operator-vsphere-locations
         {{- if and .Values.metrics.enable .Values.certmanager.enable }}
         - name: metrics-certs
           secret:
             secretName: metrics-server-cert
         {{- end }}
-      {{- end }}

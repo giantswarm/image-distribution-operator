@@ -71,7 +71,7 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 	}
 	// Update the object
 	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Update(ctx, object)
+	return i.Client.Status().Update(ctx, object)
 }
 
 func (i *Client) DeleteImage(ctx context.Context, image string) error {
@@ -133,6 +133,11 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	}
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
+
+	// If the State is empty, set it to Pending
+	if object.Status.State == "" {
+		object.Status.State = images.NodeImagePending
+	}
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
 	return i.Client.Status().Update(ctx, object)

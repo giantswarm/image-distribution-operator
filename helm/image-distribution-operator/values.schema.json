@@ -120,6 +120,9 @@
                                             }
                                         }
                                     }
+                                },
+                                "readOnlyRootFilesystem": {
+                                    "type": "boolean"
                                 }
                             }
                         }
@@ -192,6 +195,42 @@
             "properties": {
                 "enable": {
                     "type": "boolean"
+                }
+            }
+        },
+        "s3": {
+            "type": "object",
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "string"
+                }
+            }
+        },
+        "vsphere": {
+            "type": "object",
+            "properties": {
+                "credentials": {
+                    "type": "object",
+                    "properties": {
+                        "password": {
+                            "type": "string"
+                        },
+                        "username": {
+                            "type": "string"
+                        },
+                        "vcenter": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "locations": {
+                    "type": "object"
                 }
             }
         }

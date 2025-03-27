@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -77,22 +76,17 @@ func main() {
 	var s3Bucket, s3Region string
 	var s3TimeoutSeconds int
 
-	var vsphereVcenterURL, vsphereUsername, vspherePassword string
-	var vsphereDatacenter, vsphereDatastore, vsphereFolder, vsphereHost, vsphereCluster, vsphereResourcePool string
+	var vsphereCredentials string
+	var vsphereLocations string
 
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
-	flag.StringVar(&vsphereVcenterURL, "vsphere-vcenter-url", "", "The URL of the vCenter server")
-	flag.StringVar(&vsphereUsername, "vsphere-username", "", "The username for vCenter")
-	flag.StringVar(&vspherePassword, "vsphere-password", "", "The password for vCenter")
-	flag.StringVar(&vsphereDatacenter, "vsphere-datacenter", "", "The datacenter in vCenter")
-	flag.StringVar(&vsphereDatastore, "vsphere-datastore", "", "The datastore in vCenter")
-	flag.StringVar(&vsphereFolder, "vsphere-folder", "", "The VM folder in vCenter")
-	flag.StringVar(&vsphereHost, "vsphere-host", "", "The vSphere host in vCenter")
-	flag.StringVar(&vsphereCluster, "vsphere-cluster", "", "The vSphere cluster in vCenter")
-	flag.StringVar(&vsphereResourcePool, "vsphere-resource-pool", "Resources", "(optional) The resource pool in vCenter")
+	flag.StringVar(&vsphereCredentials, "vsphere-credentials", "/home/.vsphere/credentials",
+		"The file containing the credentials for vSphere resources.")
+	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations",
+		"The file containing the locations for vSphere resources")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -243,14 +237,8 @@ func main() {
 	}
 
 	vsphereClient, err := vsphere.New(vsphere.Config{
-		URL:          vsphereVcenterURL,
-		Username:     vsphereUsername,
-		Password:     vspherePassword,
-		Datacenter:   vsphereDatacenter,
-		Datastore:    vsphereDatastore,
-		Folder:       vsphereFolder,
-		Host:         vsphereHost,
-		ResourcePool: fmt.Sprintf("/%s/host/%s/%s", vsphereDatacenter, vsphereCluster, vsphereResourcePool),
+		CredentialsFile: vsphereCredentials,
+		LocationsFile:   vsphereLocations,
 	}, context.Background())
 	if err != nil {
 		setupLog.Error(err, "unable to create vSphere client")

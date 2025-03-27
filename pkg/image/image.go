@@ -22,7 +22,9 @@ func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (
 		return &images.NodeImage{}, err
 	}
 
-	return GetNodeImage(imageName, providerName, release.Name), nil
+	provider := getProviderFromProviderName(providerName)
+
+	return GetNodeImage(imageName, provider, release.Name), nil
 }
 
 func GetNodeImage(imageName, providerName, releaseName string) *images.NodeImage {
@@ -108,4 +110,22 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 	}
 
 	return releases.ReleaseSpecComponent{}, fmt.Errorf("component %s not found in release %s", component, release.Name)
+}
+
+func GetImageKey(nodeImage *images.NodeImage) string {
+	// the image name is like "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
+	// the ova file name is like "flatcar-stable-3975.2.0-kube-v1.30.4.ova"
+	ovaFileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
+	regexp := regexp.MustCompile(`(kube-)(\d+\.\d+\.\d+)`)
+	ovaFileName = regexp.ReplaceAllString(ovaFileName, `${1}v${2}`)
+	return fmt.Sprintf("%s/%s/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, ovaFileName)
+}
+
+func getProviderFromProviderName(providerName string) string {
+	switch providerName {
+	case "vsphere":
+		return "capv"
+	default:
+		return providerName
+	}
 }
