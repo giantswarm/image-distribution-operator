@@ -18,6 +18,7 @@ package release
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
@@ -63,6 +64,12 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
+
+	if !strings.HasPrefix(release.Name, "vsphere-") {
+		// For now we exclude all non vsphere releases
+		log.Info("Release " + release.Name + " is not vsphere - excluding")
+		return ctrl.Result{}, nil
+	}
 
 	nodeImage, err := image.GetNodeImageFromRelease(release, flatcarChannel)
 	if err != nil {

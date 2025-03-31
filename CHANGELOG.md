@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Exclude all non vSphere releases.
+
 ### Added
 
 - Add `imagesuffix` to location field to set a suffix on the uploaded VM template name.
