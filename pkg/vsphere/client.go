@@ -63,11 +63,13 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 	log.Info("Connecting to vSphere", "vSphereURL", vcenter)
 
-	u, err := url.Parse(fmt.Sprintf("https://%s:%s@%s/sdk",
-		username,
-		password,
-		vcenter,
-	))
+	u := &url.URL{
+		Scheme: "https",
+		Host:   vcenter,
+		Path:   "/sdk",
+		User:   url.UserPassword(username, password),
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse vSphere URL:\n%w", err)
 	}
