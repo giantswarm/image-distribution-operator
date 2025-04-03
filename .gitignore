@@ -28,3 +28,7 @@ go.work
 
 # generated helm chart
 dist/
+
+# just testing
+tmp/
+pkg/main.go
