@@ -144,7 +144,7 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 }
 
 // Import imports an OVF image to vSphere
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string, thumbprint string) (
 	*types.ManagedObjectReference, error) {
 
 	log := log.FromContext(ctx)
@@ -212,7 +212,7 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 
 	log.Info("Importing OVF", "imageURL", imageURL, "imageName", imageName)
 
-	return importer.Import(ctx, "*.ovf", *options)
+	return Import(ctx, "*.ovf", *options, importer, imageURL, thumbprint)
 }
 
 // Process processes the OVF image
