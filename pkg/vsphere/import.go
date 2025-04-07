@@ -102,18 +102,8 @@ func Import(ctx context.Context, fpath string, opts importer.Options, imp *impor
 	IsPull := true // idk
 	if IsPull {
 
-		// Wait for lease to be ready
-		_, err := lease.Wait(ctx, spec.FileItem)
-		if err != nil {
-			_ = lease.Abort(ctx, nil)
-			return nil, fmt.Errorf("failed to wait for lease: %w", err)
-		}
-
-		fmt.Println("Lease is ready, preparing to pull from URL")
-
 		sourceFiles := make([]types.HttpNfcLeaseSourceFile, len(spec.FileItem))
 		for i, fileItem := range spec.FileItem {
-			fileItem.Create = false
 			sourceFiles[i] = types.HttpNfcLeaseSourceFile{
 				Url:            url,
 				TargetDeviceId: fileItem.DeviceId,
@@ -122,7 +112,17 @@ func Import(ctx context.Context, fpath string, opts importer.Options, imp *impor
 				MemberName:     fileItem.Path,
 				SslThumbprint:  thumbprint, // todo handle thumbprint
 			}
+			fmt.Printf("url: %s, targetDeviceId: %s, create: %t, size: %d, memberName: %s\n", url, fileItem.DeviceId, fileItem.Create, fileItem.Size, fileItem.Path)
 		}
+
+		// Wait for lease to be ready
+		_, err := lease.Wait(ctx, spec.FileItem)
+		if err != nil {
+			_ = lease.Abort(ctx, nil)
+			return nil, fmt.Errorf("failed to wait for lease: %w", err)
+		}
+
+		fmt.Println("Lease is ready, preparing to pull from URL")
 
 		// Create pull task
 		fmt.Println("Creating pull task")
@@ -137,7 +137,7 @@ func Import(ctx context.Context, fpath string, opts importer.Options, imp *impor
 
 		// Wait for task completion
 		task := object.NewTask(imp.Client, t.Returnval)
-		if err := task.Wait(ctx); err != nil {
+		if err := task.WaitEx(ctx); err != nil {
 			_ = lease.Abort(ctx, nil)
 			return nil, fmt.Errorf("pull task failed: %w", err)
 		}
