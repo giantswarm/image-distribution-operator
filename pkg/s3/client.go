@@ -103,11 +103,11 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 
 // GetURL returns the URL of an image in S3
 func (c *Client) GetURL(imageKey string) string {
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucketName, c.region, imageKey)
+	return fmt.Sprintf("http://%s.s3.%s.amazonaws.com/%s", c.bucketName, c.region, imageKey)
 }
 
 // IsS3URL checks if a URL is an S3 URL
 func IsS3URL(url string) bool {
-	regexp := regexp.MustCompile(`^https://[a-zA-Z0-9-]+\.s3\.[a-z0-9-]+\.amazonaws\.com/.+`)
+	regexp := regexp.MustCompile(`^http://[a-zA-Z0-9-]+\.s3\.[a-z0-9-]+\.amazonaws\.com/.+`)
 	return regexp.MatchString(url)
 }
