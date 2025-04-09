@@ -204,6 +204,9 @@
                 "bucket": {
                     "type": "string"
                 },
+                "http": {
+                    "type": "boolean"
+                },
                 "region": {
                     "type": "string"
                 },

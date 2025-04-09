@@ -86,3 +86,4 @@ s3:
   bucket: ""
   region: ""
   timeout: ""
+  http: false

@@ -75,6 +75,7 @@ func main() {
 
 	var s3Bucket, s3Region string
 	var s3TimeoutSeconds int
+	var s3HTTP bool
 
 	var vsphereCredentials string
 	var vsphereLocations string
@@ -83,6 +84,7 @@ func main() {
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
+	flag.BoolVar(&s3HTTP, "s3-http", false, "Use HTTP instead of HTTPS for S3 operations.")
 	flag.StringVar(&vsphereCredentials, "vsphere-credentials", "/home/.vsphere/credentials",
 		"The file containing the credentials for vSphere resources.")
 	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations",
@@ -230,6 +232,7 @@ func main() {
 		BucketName: s3Bucket,
 		Region:     s3Region,
 		Timeout:    time.Duration(s3TimeoutSeconds) * time.Second,
+		HTTP:       s3HTTP,
 	}, context.Background())
 	if err != nil {
 		setupLog.Error(err, "unable to create S3 client")

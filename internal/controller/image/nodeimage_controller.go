@@ -111,7 +111,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	url := r.S3Client.GetURL(imageKey)
 
 	// Check if the url is valid
-	if err := ValidURL(url); err != nil {
+	if err := r.S3Client.ValidURL(url); err != nil {
 		log.Info("Invalid URL", "url", url)
 		return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
 	}
@@ -222,18 +222,6 @@ func (r *NodeImageReconciler) UpdateStatus(ctx context.Context, nodeImage *image
 
 func IsDeleted(nodeImage *imagev1alpha1.NodeImage) bool {
 	return !nodeImage.DeletionTimestamp.IsZero()
-}
-
-func ValidURL(url string) error {
-	if url == "" {
-		return fmt.Errorf("URL is empty")
-	}
-
-	// Check that the URL is an s3 bucket
-	if !s3.IsS3URL(url) {
-		return fmt.Errorf("URL is not an S3 bucket")
-	}
-	return nil
 }
 
 func ImageAvailable(url string) error {

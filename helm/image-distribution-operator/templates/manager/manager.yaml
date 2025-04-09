@@ -33,6 +33,7 @@ spec:
             {{- end }}
             - --s3-bucket={{ .Values.s3.bucket }}
             - --s3-region={{ .Values.s3.region }}
+            - --s3-http={{ .Values.s3.http }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"

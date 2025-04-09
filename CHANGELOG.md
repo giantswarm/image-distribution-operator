@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `s3.http` option to enable HTTP instead of HTTPS for pulling images from S3.
+
 ## [0.2.1] - 2025-04-01
 
 ### Changed
