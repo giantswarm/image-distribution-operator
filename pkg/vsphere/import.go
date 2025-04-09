@@ -20,7 +20,8 @@ import (
 )
 
 // based on upstream importer package except we use pull instead of push
-func PullImport(ctx context.Context, fpath string, opts importer.Options, imp *importer.Importer, url string) (*types.ManagedObjectReference, error) {
+func PullImport(ctx context.Context,
+	fpath string, opts importer.Options, imp *importer.Importer, url string) (*types.ManagedObjectReference, error) {
 
 	o, err := importer.ReadOvf(fpath, imp.Archive)
 	if err != nil {
@@ -163,7 +164,11 @@ func getSSLFingerprint(imageURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("failed to close connection: %v\n", cerr)
+		}
+	}()
 
 	cert := conn.ConnectionState().PeerCertificates[0]
 	hash := sha1.Sum(cert.Raw)
