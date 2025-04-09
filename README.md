@@ -63,6 +63,16 @@ vsphere:
 
 ## Getting Started
 
+### Network requirements
+
+#### Pull mode
+
+The vSphere ESXi hosts must have access to the internet on port 443 (or 80, not preferred), this includes the vSphere firewall outgoing rules under `Hostname > Configure > System > Firewall > Outgoing > Edit > httpClient`.
+
+#### Push mode
+
+The IDO pod must have access to the IP of the vSphere ESXi hosts on port 443.
+
 ### Prerequisites
 - go version v1.23.0+
 - docker version 17.03+.
