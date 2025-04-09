@@ -3,7 +3,7 @@ package vsphere
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G401
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
