@@ -156,10 +156,17 @@ func getSSLFingerprint(imageURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid URL: %w", err)
 	}
+
+	// if its http, return 0000
+	if u.Scheme == "http" {
+		return "0000", nil
+	}
+
 	host := u.Hostname()
 
 	conn, err := tls.Dial("tcp", net.JoinHostPort(host, "443"), &tls.Config{
 		ServerName: host,
+		MinVersion: tls.VersionTLS12, // #nosec G402 - minimum secure version
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to connect: %w", err)
@@ -171,7 +178,7 @@ func getSSLFingerprint(imageURL string) (string, error) {
 	}()
 
 	cert := conn.ConnectionState().PeerCertificates[0]
-	hash := sha1.Sum(cert.Raw)
+	hash := sha1.Sum(cert.Raw) // #nosec G401 -- vSphere requires SHA1 for certificate thumbprints
 
 	return strings.ToUpper(hex.EncodeToString(hash[:])), nil
 }
