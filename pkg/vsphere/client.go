@@ -19,6 +19,7 @@ import (
 type Client struct {
 	vsphere   *govmomi.Client
 	url       string
+	pullMode  bool
 	Locations map[string]*Location
 }
 
@@ -37,6 +38,7 @@ type Location struct {
 type Config struct {
 	CredentialsFile string
 	LocationsFile   string
+	PullMode        bool
 }
 
 // ImporterConfig holds the configuration for the OVF importer
@@ -90,6 +92,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		vsphere:   client,
 		url:       vcenter,
 		Locations: locations,
+		pullMode:  c.PullMode,
 	}, nil
 }
 
@@ -144,7 +147,7 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 }
 
 // Import imports an OVF image to vSphere
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string, thumbprint string) (
+func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (
 	*types.ManagedObjectReference, error) {
 
 	log := log.FromContext(ctx)
@@ -212,7 +215,11 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 
 	log.Info("Importing OVF", "imageURL", imageURL, "imageName", imageName)
 
-	return Import(ctx, "*.ovf", *options, importer, imageURL, thumbprint)
+	if c.pullMode {
+		log.Info("Pull mode enabled")
+		return PullImport(ctx, "*.ovf", *options, importer, imageURL)
+	}
+	return importer.Import(ctx, "*.ovf", *options)
 }
 
 // Process processes the OVF image

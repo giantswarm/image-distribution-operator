@@ -3,8 +3,14 @@ package vsphere
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
+	"strings"
 
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf"
@@ -13,8 +19,8 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-// taken from the importer package
-func Import(ctx context.Context, fpath string, opts importer.Options, imp *importer.Importer, url string, thumbprint string) (*types.ManagedObjectReference, error) {
+// based on upstream importer package except we use pull instead of push
+func PullImport(ctx context.Context, fpath string, opts importer.Options, imp *importer.Importer, url string) (*types.ManagedObjectReference, error) {
 
 	o, err := importer.ReadOvf(fpath, imp.Archive)
 	if err != nil {
@@ -99,73 +105,68 @@ func Import(ctx context.Context, fpath string, opts importer.Options, imp *impor
 		return nil, err
 	}
 
-	IsPull := true // idk
-	if IsPull {
-
-		sourceFiles := make([]types.HttpNfcLeaseSourceFile, len(spec.FileItem))
-		for i, fileItem := range spec.FileItem {
-			sourceFiles[i] = types.HttpNfcLeaseSourceFile{
-				Url:            url,
-				TargetDeviceId: fileItem.DeviceId,
-				Create:         fileItem.Create,
-				Size:           fileItem.Size,
-				MemberName:     fileItem.Path,
-				SslThumbprint:  thumbprint, // todo handle thumbprint
-			}
-			fmt.Printf("url: %s, targetDeviceId: %s, create: %t, size: %d, memberName: %s\n", url, fileItem.DeviceId, fileItem.Create, fileItem.Size, fileItem.Path)
-		}
-
-		// Wait for lease to be ready
-		_, err := lease.Wait(ctx, spec.FileItem)
-		if err != nil {
-			_ = lease.Abort(ctx, nil)
-			return nil, fmt.Errorf("failed to wait for lease: %w", err)
-		}
-
-		fmt.Println("Lease is ready, preparing to pull from URL")
-
-		// Create pull task
-		fmt.Println("Creating pull task")
-		t, err := methods.HttpNfcLeasePullFromUrls_Task(ctx, imp.Client, &types.HttpNfcLeasePullFromUrls_Task{
-			This:  lease.Reference(),
-			Files: sourceFiles,
-		})
-		if err != nil {
-			_ = lease.Abort(ctx, nil)
-			return nil, fmt.Errorf("failed to start pull task: %w", err)
-		}
-
-		// Wait for task completion
-		task := object.NewTask(imp.Client, t.Returnval)
-		if err := task.WaitEx(ctx); err != nil {
-			_ = lease.Abort(ctx, nil)
-			return nil, fmt.Errorf("pull task failed: %w", err)
-		}
-
-		// Complete the lease
-		return &t.Returnval, lease.Complete(ctx)
-
+	thumbprint, err := getSSLFingerprint(url)
+	if err != nil {
+		_ = lease.Abort(ctx, nil)
+		return nil, fmt.Errorf("failed to get SSL fingerprint: %w", err)
 	}
 
+	sourceFiles := make([]types.HttpNfcLeaseSourceFile, len(spec.FileItem))
+	for i, fileItem := range spec.FileItem {
+		sourceFiles[i] = types.HttpNfcLeaseSourceFile{
+			Url:            url,
+			TargetDeviceId: fileItem.DeviceId,
+			Create:         fileItem.Create,
+			Size:           fileItem.Size,
+			MemberName:     fileItem.Path,
+			SslThumbprint:  thumbprint,
+		}
+	}
+
+	// Wait for lease to be ready
 	info, err := lease.Wait(ctx, spec.FileItem)
 	if err != nil {
 		_ = lease.Abort(ctx, nil)
-		return nil, err
+		return nil, fmt.Errorf("failed to wait for lease: %w", err)
 	}
 
-	u := lease.StartUpdater(ctx, info)
-	defer u.Done()
-
-	for _, i := range info.Items {
-		if err := imp.Upload(ctx, lease, i); err != nil {
-			_ = lease.Abort(ctx, &types.LocalizedMethodFault{
-				Fault: &types.FileFault{
-					File: i.Path,
-				},
-			})
-			return nil, err
-		}
+	t, err := methods.HttpNfcLeasePullFromUrls_Task(ctx, imp.Client, &types.HttpNfcLeasePullFromUrls_Task{
+		This:  lease.Reference(),
+		Files: sourceFiles,
+	})
+	if err != nil {
+		_ = lease.Abort(ctx, nil)
+		return nil, fmt.Errorf("failed to start pull task: %w", err)
 	}
 
+	// Wait for task completion
+	task := object.NewTask(imp.Client, t.Returnval)
+	if err := task.WaitEx(ctx); err != nil {
+		_ = lease.Abort(ctx, nil)
+		return nil, fmt.Errorf("pull task failed: %w", err)
+	}
+
+	// Complete the lease
 	return &info.Entity, lease.Complete(ctx)
+}
+
+func getSSLFingerprint(imageURL string) (string, error) {
+	u, err := url.Parse(imageURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL: %w", err)
+	}
+	host := u.Hostname()
+
+	conn, err := tls.Dial("tcp", net.JoinHostPort(host, "443"), &tls.Config{
+		ServerName: host,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to connect: %w", err)
+	}
+	defer conn.Close()
+
+	cert := conn.ConnectionState().PeerCertificates[0]
+	hash := sha1.Sum(cert.Raw)
+
+	return strings.ToUpper(hex.EncodeToString(hash[:])), nil
 }

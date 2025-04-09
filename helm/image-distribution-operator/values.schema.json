@@ -234,6 +234,9 @@
                 },
                 "locations": {
                     "type": "object"
+                },
+                "pullFromURL": {
+                    "type": "boolean"
                 }
             }
         }

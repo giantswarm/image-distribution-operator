@@ -162,7 +162,7 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// import the image
-	object, err := r.VsphereClient.Import(ctx, url, nodeImage.Spec.Name, loc, "")
+	object, err := r.VsphereClient.Import(ctx, url, nodeImage.Spec.Name, loc)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}

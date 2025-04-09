@@ -79,6 +79,7 @@ func main() {
 
 	var vsphereCredentials string
 	var vsphereLocations string
+	var vspherePullFromURL bool
 
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
@@ -89,6 +90,8 @@ func main() {
 		"The file containing the credentials for vSphere resources.")
 	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations",
 		"The file containing the locations for vSphere resources")
+	flag.BoolVar(&vspherePullFromURL, "vsphere-pull-from-url", false,
+		"Use pull mode for vSphere images. This will pull the image from the URL instead of uploading to vSphere.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -242,6 +245,7 @@ func main() {
 	vsphereClient, err := vsphere.New(vsphere.Config{
 		CredentialsFile: vsphereCredentials,
 		LocationsFile:   vsphereLocations,
+		PullMode:        vspherePullFromURL,
 	}, context.Background())
 	if err != nil {
 		setupLog.Error(err, "unable to create vSphere client")

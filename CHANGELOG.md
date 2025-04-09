@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `s3.http` option to enable HTTP instead of HTTPS for pulling images from S3.
+- Add `vsphere.pullFromURL` option to pull images directly from a URL instead of uploading them to vSphere.
 
 ## [0.2.1] - 2025-04-01
 
