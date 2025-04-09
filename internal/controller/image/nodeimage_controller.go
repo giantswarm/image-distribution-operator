@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -125,7 +127,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageMissing); err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
 				}
-				return ctrl.Result{}, nil
+				return DefaultRequeue(), nil
 			}
 			if err := r.CreateVsphere(ctx, nodeImage, url, loc); err != nil {
 				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
@@ -140,7 +142,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Info("Provider not supported", "provider", nodeImage.Spec.Provider)
 	}
 
-	return ctrl.Result{}, nil
+	return DefaultRequeue(), nil
 }
 
 func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string) error {
@@ -245,4 +247,11 @@ func ImageAvailable(url string) error {
 	}
 
 	return fmt.Errorf("OVA file not found, status code: %d", resp.StatusCode)
+}
+
+func DefaultRequeue() reconcile.Result {
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: time.Minute * 5,
+	}
 }
