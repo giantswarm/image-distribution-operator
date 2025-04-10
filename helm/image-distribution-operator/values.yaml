@@ -77,6 +77,7 @@ networkPolicy:
   enable: false
 
 vsphere:
+  pullFromURL: false
   credentials:
     username: ""
     password: ""
@@ -86,3 +87,4 @@ s3:
   bucket: ""
   region: ""
   timeout: ""
+  http: false

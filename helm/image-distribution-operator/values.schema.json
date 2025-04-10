@@ -204,6 +204,9 @@
                 "bucket": {
                     "type": "string"
                 },
+                "http": {
+                    "type": "boolean"
+                },
                 "region": {
                     "type": "string"
                 },
@@ -231,6 +234,9 @@
                 },
                 "locations": {
                     "type": "object"
+                },
+                "pullFromURL": {
+                    "type": "boolean"
                 }
             }
         }

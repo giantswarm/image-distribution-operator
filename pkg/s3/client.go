@@ -18,12 +18,14 @@ import (
 // S3Client wraps the AWS SDK client
 type Client struct {
 	s3         s3.Client
+	protocol   string
 	bucketName string
 	region     string
 	timeout    time.Duration
 }
 
 type Config struct {
+	HTTP       bool
 	BucketName string
 	Region     string
 	Timeout    time.Duration
@@ -40,12 +42,19 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	// Set protocol based on HTTP flag
+	protocol := "https"
+	if c.HTTP {
+		protocol = "http"
+	}
+
 	client := s3.NewFromConfig(cfg)
 	return &Client{
 		s3:         *client,
 		bucketName: c.BucketName,
 		timeout:    c.Timeout,
 		region:     c.Region,
+		protocol:   protocol,
 	}, nil
 }
 
@@ -103,11 +112,24 @@ func (c *Client) Pull(ctx context.Context, imageKey string) (string, error) {
 
 // GetURL returns the URL of an image in S3
 func (c *Client) GetURL(imageKey string) string {
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucketName, c.region, imageKey)
+	return fmt.Sprintf("%s://%s.s3.%s.amazonaws.com/%s", c.protocol, c.bucketName, c.region, imageKey)
 }
 
 // IsS3URL checks if a URL is an S3 URL
-func IsS3URL(url string) bool {
-	regexp := regexp.MustCompile(`^https://[a-zA-Z0-9-]+\.s3\.[a-z0-9-]+\.amazonaws\.com/.+`)
+func (c *Client) IsS3URL(url string) bool {
+	pattern := fmt.Sprintf(`^%s://[a-zA-Z0-9-]+\.s3\.[a-z0-9-]+\.amazonaws\.com/.+`, c.protocol)
+	regexp := regexp.MustCompile(pattern)
 	return regexp.MatchString(url)
+}
+
+func (c *Client) ValidURL(url string) error {
+	if url == "" {
+		return fmt.Errorf("URL is empty")
+	}
+
+	// Check that the URL is an s3 bucket
+	if !c.IsS3URL(url) {
+		return fmt.Errorf("URL is not an S3 bucket")
+	}
+	return nil
 }
