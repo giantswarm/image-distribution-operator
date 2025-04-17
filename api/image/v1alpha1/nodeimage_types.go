@@ -61,6 +61,7 @@ type NodeImageStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`,description="Current Status of the image"
 
 // NodeImage is the Schema for the nodeimages API.
 type NodeImage struct {

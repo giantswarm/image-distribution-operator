@@ -14,7 +14,12 @@ spec:
     singular: nodeimage
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Current Status of the image
+      jsonPath: .status.state
+      name: State
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NodeImage is the Schema for the nodeimages API.
