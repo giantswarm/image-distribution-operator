@@ -52,7 +52,7 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 
 	// Get Image Object
 	object := &images.NodeImage{}
-	if err := i.Client.Get(ctx, client.ObjectKey{
+	if err := i.Get(ctx, client.ObjectKey{
 		Namespace: i.Namespace,
 		Name:      image,
 	}, object); err != nil {
@@ -79,7 +79,7 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 
 	// Get Image Object
 	object := &images.NodeImage{}
-	if err := i.Client.Get(ctx, client.ObjectKey{
+	if err := i.Get(ctx, client.ObjectKey{
 		Namespace: i.Namespace,
 		Name:      image,
 	}, object); err != nil {
@@ -96,7 +96,7 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 
 	// If there are no releases left, delete the object
 	log.Info("Deleting node image", "nodeImage", object.Name)
-	return i.Client.Delete(ctx, object)
+	return i.Delete(ctx, object)
 }
 
 func (i *Client) CreateImage(ctx context.Context, image *images.NodeImage) error {
@@ -117,7 +117,7 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 
 	// Get Image Object
 	object := &images.NodeImage{}
-	if err := i.Client.Get(ctx, client.ObjectKey{
+	if err := i.Get(ctx, client.ObjectKey{
 		Namespace: i.Namespace,
 		Name:      image,
 	}, object); err != nil {
