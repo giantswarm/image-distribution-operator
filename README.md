@@ -56,7 +56,7 @@ vsphere:
       cluster: "another-cluster"
       folder: "another-folder"
       resourcepool: "my-resourcepool" # Optional
-      host: "my-host" # Optional
+      host: "my-host" # Optional - First host in the cluster by default
       network: "my-network" # Optional
       imagesuffix: "my-suffix" # Optional
 ```
