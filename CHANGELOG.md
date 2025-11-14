@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Allow IDO to select an upload target from the list of available hosts.
+
 ### Fixed
 
 - Correct golangci-lint config.
