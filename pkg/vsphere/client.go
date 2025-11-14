@@ -285,13 +285,17 @@ func (c *Client) getFolder(ctx context.Context, folder string, finder *find.Find
 
 // getHost returns the host object
 func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Finder) (*object.HostSystem, error) {
+	log := log.FromContext(ctx)
 	var host *object.HostSystem
 	var err error
 	if hostName != "" {
 		host, err = finder.HostSystemOrDefault(ctx, hostName)
-		fmt.Printf("%v", host)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find host %s: %w", hostName, err)
+		}
+		// Validate the specified host is in a usable state
+		if err := c.validateHostState(ctx, host); err != nil {
+			return nil, fmt.Errorf("host %s is not in a usable state: %w", hostName, err)
 		}
 	} else {
 		hosts, err := finder.HostSystemList(ctx, "*") // Get all hosts
@@ -301,9 +305,58 @@ func (c *Client) getHost(ctx context.Context, hostName string, finder *find.Find
 		if len(hosts) == 0 {
 			return nil, fmt.Errorf("no hosts found in vSphere")
 		}
-		host = hosts[0]
+		// Filter hosts to find one that's in a usable state
+		host, err = c.findUsableHost(ctx, hosts)
+		if err != nil {
+			return nil, err
+		}
 	}
+	log.Info("Using host for import", "host", host.Name())
 	return host, nil
+}
+
+// validateHostState checks if a host is in a usable state for VM operations
+func (c *Client) validateHostState(ctx context.Context, host *object.HostSystem) error {
+	var props struct {
+		Runtime types.HostRuntimeInfo `mo:"runtime"`
+	}
+
+	err := host.Properties(ctx, host.Reference(), []string{"runtime"}, &props)
+	if err != nil {
+		return fmt.Errorf("failed to get host runtime info: %w", err)
+	}
+
+	// Check connection state
+	if props.Runtime.ConnectionState != types.HostSystemConnectionStateConnected {
+		return fmt.Errorf("host connection state is %s (expected connected)", props.Runtime.ConnectionState)
+	}
+
+	// Check if host is in maintenance mode
+	if props.Runtime.InMaintenanceMode {
+		return fmt.Errorf("host is in maintenance mode")
+	}
+
+	// Check power state
+	if props.Runtime.PowerState != types.HostSystemPowerStatePoweredOn {
+		return fmt.Errorf("host power state is %s (expected poweredOn)", props.Runtime.PowerState)
+	}
+
+	return nil
+}
+
+// findUsableHost finds the first host from the list that's in a usable state
+func (c *Client) findUsableHost(ctx context.Context, hosts []*object.HostSystem) (*object.HostSystem, error) {
+	log := log.FromContext(ctx)
+
+	for _, host := range hosts {
+		if err := c.validateHostState(ctx, host); err != nil {
+			log.Info("Skipping host due to unusable state", "host", host.Name(), "reason", err.Error())
+			continue
+		}
+		return host, nil
+	}
+
+	return nil, fmt.Errorf("no usable hosts found - all hosts are either disconnected, in maintenance mode, or powered off")
 }
 
 // getResourcePool returns the resource pool object
