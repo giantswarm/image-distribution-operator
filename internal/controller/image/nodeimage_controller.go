@@ -36,14 +36,13 @@ import (
 
 const (
 	NodeImageFinalizer = "image-distribution-operator.finalizers.giantswarm.io/node-image-controller"
-	ProviderVsphere    = "capv"
 )
 
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	S3Client *s3.Client
-	Provider provider.Provider
+	S3Client  *s3.Client
+	Providers map[string]provider.Provider
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -72,20 +71,29 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if IsDeleted(nodeImage) {
 		log.Info("NodeImage is being deleted", "nodeImage", nodeImage.Name)
 
-		switch nodeImage.Spec.Provider {
-		case ProviderVsphere:
-			for loc := range r.Provider.GetLocations() {
-				if err := r.DeleteProvider(ctx, nodeImage, loc); err != nil {
-					if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-						return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
-					}
+		// Get the provider for this NodeImage
+		prov, ok := r.Providers[nodeImage.Spec.Provider]
+		if !ok {
+			log.Info("Provider not configured - skipping deletion", "provider", nodeImage.Spec.Provider)
+			// Remove finalizer even if provider is not configured
+			if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
+				controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
+				if err := r.Update(ctx, nodeImage); err != nil {
 					return ctrl.Result{}, err
 				}
+				log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
 			}
-		case "test":
-			log.Info("Test provider does not need to be deleted", "provider", nodeImage.Spec.Provider)
-		default:
-			log.Info("Provider not supported", "provider", nodeImage.Spec.Provider)
+			return ctrl.Result{}, nil
+		}
+
+		// Delete from all locations
+		for loc := range prov.GetLocations() {
+			if err := r.DeleteProvider(ctx, nodeImage, loc, prov); err != nil {
+				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
+				}
+				return ctrl.Result{}, err
+			}
 		}
 
 		// Remove finalizer
@@ -118,38 +126,43 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, fmt.Errorf("invalid URL: %s", url)
 	}
 
-	switch nodeImage.Spec.Provider {
-	case ProviderVsphere:
-		for loc := range r.Provider.GetLocations() {
-			// check if the image is available
-			if err := ImageAvailable(url); err != nil {
-				log.Info("Image not available on S3 - marking as missing", "url", url, "response", err)
-				if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageMissing); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
-				}
-				return DefaultRequeue(), nil
-			}
-			if err := r.CreateProvider(ctx, nodeImage, url, loc); err != nil {
-				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
-				}
-				return ctrl.Result{}, err
-			}
+	// Get the provider for this NodeImage
+	prov, ok := r.Providers[nodeImage.Spec.Provider]
+	if !ok {
+		err := fmt.Errorf("provider %s is not configured - check operator configuration", nodeImage.Spec.Provider)
+		log.Error(err, "Provider not available", "provider", nodeImage.Spec.Provider)
+		if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+			return ctrl.Result{}, fmt.Errorf("provider not configured: %w\nfailed to update status: %w", err, statusErr)
 		}
-	case "test":
-		log.Info("Test provider does not need to be created", "provider", nodeImage.Spec.Provider)
-	default:
-		log.Info("Provider not supported", "provider", nodeImage.Spec.Provider)
+		return ctrl.Result{}, err
+	}
+
+	// Process image for all locations in the provider
+	for loc := range prov.GetLocations() {
+		// check if the image is available
+		if err := ImageAvailable(url); err != nil {
+			log.Info("Image not available on S3 - marking as missing", "url", url, "response", err)
+			if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageMissing); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update status: %w", err)
+			}
+			return DefaultRequeue(), nil
+		}
+		if err := r.CreateProvider(ctx, nodeImage, url, loc, prov); err != nil {
+			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
+			}
+			return ctrl.Result{}, err
+		}
 	}
 
 	return DefaultRequeue(), nil
 }
 
-func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string) error {
+func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string, prov provider.Provider) error {
 	log := log.FromContext(ctx)
 
 	// check if the image is already uploaded
-	if exists, err := r.Provider.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
+	if exists, err := prov.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to check if image exists: %w", err)
 	} else if exists {
 		// set the status
@@ -164,7 +177,7 @@ func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *ima
 	}
 
 	// import the image
-	err := r.Provider.Create(ctx, url, nodeImage.Spec.Name, loc)
+	err := prov.Create(ctx, url, nodeImage.Spec.Name, loc)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}
@@ -175,7 +188,7 @@ func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *ima
 	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 }
 
-func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string) error {
+func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string, prov provider.Provider) error {
 	log := log.FromContext(ctx)
 
 	// set the status
@@ -184,7 +197,7 @@ func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *ima
 	}
 
 	// delete the image
-	if err := r.Provider.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
+	if err := prov.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
 	}
 
