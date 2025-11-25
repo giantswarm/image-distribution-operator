@@ -32,3 +32,4 @@ dist/
 # just testing
 tmp/
 pkg/main.go
+.github/copilot-instructions.md

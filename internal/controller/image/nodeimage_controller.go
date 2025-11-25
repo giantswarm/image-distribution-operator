@@ -164,20 +164,12 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// import the image
-	object, err := r.VsphereClient.Import(ctx, url, nodeImage.Spec.Name, loc)
+	err := r.VsphereClient.Create(ctx, url, nodeImage.Spec.Name, loc)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}
 
-	log.Info("Node image uploaded", "nodeImage", nodeImage.Name, "location", loc)
-
-	// process the image
-	err = r.VsphereClient.Process(ctx, *object)
-	if err != nil {
-		return fmt.Errorf("failed to process image: %w", err)
-	}
-
-	log.Info("Node image processed", "nodeImage", nodeImage.Name, "location", loc)
+	log.Info("Node image uploaded and processed", "nodeImage", nodeImage.Name, "location", loc)
 
 	// set the status
 	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
