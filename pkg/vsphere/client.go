@@ -93,6 +93,15 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}, nil
 }
 
+// GetLocations returns all configured vSphere locations
+func (c *Client) GetLocations() map[string]interface{} {
+	locations := make(map[string]interface{})
+	for k, v := range c.Locations {
+		locations[k] = v
+	}
+	return locations
+}
+
 // Exists checks if an image already exists in vSphere
 func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, error) {
 	finder := find.NewFinder(c.vsphere.Client, true)

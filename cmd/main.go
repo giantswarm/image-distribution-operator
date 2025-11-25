@@ -260,9 +260,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		S3Client:      s3Client,
-		VsphereClient: vsphereClient,
-		Client:        mgr.GetClient(),
+		S3Client: s3Client,
+		Provider: vsphereClient,
+		Client:   mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

@@ -24,8 +24,8 @@ import (
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
+	"github.com/giantswarm/image-distribution-operator/pkg/provider"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
-	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,8 +42,8 @@ const (
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	S3Client      *s3.Client
-	VsphereClient *vsphere.Client
+	S3Client *s3.Client
+	Provider provider.Provider
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -74,8 +74,8 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		switch nodeImage.Spec.Provider {
 		case ProviderVsphere:
-			for loc := range r.VsphereClient.Locations {
-				if err := r.DeleteVsphere(ctx, nodeImage, loc); err != nil {
+			for loc := range r.Provider.GetLocations() {
+				if err := r.DeleteProvider(ctx, nodeImage, loc); err != nil {
 					if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 						return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
 					}
@@ -120,7 +120,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	switch nodeImage.Spec.Provider {
 	case ProviderVsphere:
-		for loc := range r.VsphereClient.Locations {
+		for loc := range r.Provider.GetLocations() {
 			// check if the image is available
 			if err := ImageAvailable(url); err != nil {
 				log.Info("Image not available on S3 - marking as missing", "url", url, "response", err)
@@ -129,7 +129,7 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				}
 				return DefaultRequeue(), nil
 			}
-			if err := r.CreateVsphere(ctx, nodeImage, url, loc); err != nil {
+			if err := r.CreateProvider(ctx, nodeImage, url, loc); err != nil {
 				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
 				}
@@ -145,11 +145,11 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return DefaultRequeue(), nil
 }
 
-func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string) error {
+func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string) error {
 	log := log.FromContext(ctx)
 
 	// check if the image is already uploaded
-	if exists, err := r.VsphereClient.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
+	if exists, err := r.Provider.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to check if image exists: %w", err)
 	} else if exists {
 		// set the status
@@ -164,7 +164,7 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// import the image
-	err := r.VsphereClient.Create(ctx, url, nodeImage.Spec.Name, loc)
+	err := r.Provider.Create(ctx, url, nodeImage.Spec.Name, loc)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}
@@ -175,7 +175,7 @@ func (r *NodeImageReconciler) CreateVsphere(ctx context.Context, nodeImage *imag
 	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 }
 
-func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string) error {
+func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string) error {
 	log := log.FromContext(ctx)
 
 	// set the status
@@ -184,7 +184,7 @@ func (r *NodeImageReconciler) DeleteVsphere(ctx context.Context, nodeImage *imag
 	}
 
 	// delete the image
-	if err := r.VsphereClient.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
+	if err := r.Provider.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
 	}
 
