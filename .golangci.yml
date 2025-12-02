@@ -1,8 +1,8 @@
-version: "2"
 run:
   allow-parallel-runners: true
+
 linters:
-  default: none
+  disable-all: true
   enable:
     - copyloopvar
     - dupl
@@ -10,6 +10,8 @@ linters:
     - ginkgolinter
     - goconst
     - gocyclo
+    - gofmt
+    - goimports
     - govet
     - ineffassign
     - lll
@@ -21,33 +23,20 @@ linters:
     - unconvert
     - unparam
     - unused
-  settings:
-    revive:
-      rules:
-        - name: comment-spacings
-  exclusions:
-    generated: lax
+
+linters-settings:
+  revive:
     rules:
-      - linters:
-          - lll
-        path: api/*
-      - linters:
-          - dupl
-          - lll
-        path: internal/*
-    paths:
-      - test
-      - third_party$
-      - builtin$
-      - examples$
-formatters:
-  enable:
-    - gofmt
-    - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - test
-      - third_party$
-      - builtin$
-      - examples$
+      - name: comment-spacings
+
+issues:
+  exclude-dirs:
+    - test
+  exclude-rules:
+    - path: api/.*
+      linters:
+        - lll
+    - path: internal/.*
+      linters:
+        - dupl
+        - lll

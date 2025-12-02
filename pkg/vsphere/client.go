@@ -59,7 +59,7 @@ type ImporterConfig struct {
 func New(c Config, ctx context.Context) (*Client, error) {
 	log := log.FromContext(ctx)
 
-	vcenter, username, password, err := LoadCredentials(c.CredentialsFile)
+	vcenter, username, password, err := loadCredentials(c.CredentialsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load credentials:\n%w", err)
 	}
@@ -80,7 +80,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 	log.Info("Successfully connected to vSphere", "vSphereURL", vcenter)
 
-	locations, err := LoadLocations(c.LocationsFile)
+	locations, err := loadLocations(c.LocationsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load locations file:\n%w", err)
 	}
@@ -91,6 +91,15 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		Locations: locations,
 		pullMode:  c.PullMode,
 	}, nil
+}
+
+// GetLocations returns all configured vSphere locations
+func (c *Client) GetLocations() map[string]interface{} {
+	locations := make(map[string]interface{})
+	for k, v := range c.Locations {
+		locations[k] = v
+	}
+	return locations
 }
 
 // Exists checks if an image already exists in vSphere
@@ -143,8 +152,17 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 	return nil
 }
 
-// Import imports an OVF image to vSphere
-func (c *Client) Import(ctx context.Context, imageURL string, imageName string, loc string) (
+// Create imports and processes an OVF image to vSphere
+func (c *Client) Create(ctx context.Context, imageURL string, imageName string, loc string) error {
+	object, err := c.importImage(ctx, imageURL, imageName, loc)
+	if err != nil {
+		return fmt.Errorf("failed to import OVA: %w", err)
+	}
+	return c.processImage(ctx, *object)
+}
+
+// importImage imports an OVF image to vSphere
+func (c *Client) importImage(ctx context.Context, imageURL string, imageName string, loc string) (
 	*types.ManagedObjectReference, error) {
 
 	log := log.FromContext(ctx)
@@ -220,7 +238,7 @@ func (c *Client) Import(ctx context.Context, imageURL string, imageName string, 
 }
 
 // Process processes the OVF image
-func (c *Client) Process(ctx context.Context, ref types.ManagedObjectReference) error {
+func (c *Client) processImage(ctx context.Context, ref types.ManagedObjectReference) error {
 	log := log.FromContext(ctx)
 	vm := object.NewVirtualMachine(c.vsphere.Client, ref)
 
@@ -350,7 +368,9 @@ func (c *Client) findUsableHost(ctx context.Context, hosts []*object.HostSystem)
 		return host, nil
 	}
 
-	return nil, fmt.Errorf("no usable hosts found - all hosts are either disconnected, in maintenance mode, or powered off")
+	return nil, fmt.Errorf(
+		"no usable hosts found - all hosts are either disconnected, in maintenance mode, or powered off",
+	)
 }
 
 // getResourcePool returns the resource pool object
@@ -388,7 +408,7 @@ func (c *Client) GetVMPath(name string, loc string) string {
 	return fmt.Sprintf("%s/%s", c.Locations[loc].Folder, name)
 }
 
-func LoadLocations(path string) (map[string]*Location, error) {
+func loadLocations(path string) (map[string]*Location, error) {
 	locations := make(map[string]*Location)
 
 	file, err := os.ReadFile(path) // nolint:gosec
@@ -418,7 +438,7 @@ func LoadLocations(path string) (map[string]*Location, error) {
 	return locations, nil
 }
 
-func LoadCredentials(path string) (string, string, string, error) {
+func loadCredentials(path string) (string, string, string, error) {
 	file, err := os.ReadFile(path) // nolint:gosec
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to read credentials file:\n%w", err)

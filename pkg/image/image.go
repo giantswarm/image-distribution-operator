@@ -17,7 +17,7 @@ func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (
 		return &images.NodeImage{}, err
 	}
 
-	providerName, err := getImageProvider(release.Name)
+	providerName, err := GetImageProvider(release.Name)
 	if err != nil {
 		return &images.NodeImage{}, err
 	}
@@ -79,7 +79,8 @@ func getImageName(release *releases.Release, flatcarChannel string) (string, err
 	return buildImageName(flatcarChannel, flatcarVersion, kubernetesVersion, toolingVersion), nil
 }
 
-func getImageProvider(release string) (string, error) {
+// GetImageProvider extracts the provider name from a release name (e.g., "vsphere-1.2.3" -> "vsphere")
+func GetImageProvider(release string) (string, error) {
 	// the provider name is the first part of the name before the first digit
 	regexp := regexp.MustCompile(`^([a-z-]+)-\d+\.\d+\.\d+`)
 	matches := regexp.FindStringSubmatch(release)

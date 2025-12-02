@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	"github.com/giantswarm/image-distribution-operator/pkg/provider"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 )
 
@@ -80,8 +81,9 @@ var _ = Describe("NodeImage Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &NodeImageReconciler{
-				Client:   k8sClient,
-				S3Client: s3Client,
+				Client:    k8sClient,
+				S3Client:  s3Client,
+				Providers: make(map[string]provider.Provider), // Empty providers map - test provider doesn't need actual implementation
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

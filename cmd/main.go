@@ -43,6 +43,7 @@ import (
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	imagecontroller "github.com/giantswarm/image-distribution-operator/internal/controller/image"
 	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
+	"github.com/giantswarm/image-distribution-operator/pkg/provider"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 	// +kubebuilder:scaffold:imports
@@ -242,14 +243,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize provider registry - providers that fail to initialize are logged but don't stop startup
+	providers := make(map[string]provider.Provider)
+
+	// Try to initialize vSphere provider
 	vsphereClient, err := vsphere.New(vsphere.Config{
 		CredentialsFile: vsphereCredentials,
 		LocationsFile:   vsphereLocations,
 		PullMode:        vspherePullFromURL,
 	}, context.Background())
 	if err != nil {
-		setupLog.Error(err, "unable to create vSphere client")
-		os.Exit(1)
+		setupLog.Info("vSphere provider not configured - will fail if NodeImage references 'capv' provider", "error", err)
+	} else {
+		providers["capv"] = vsphereClient
+		setupLog.Info("vSphere provider initialized successfully", "provider", "capv")
 	}
 
 	if err = (&release.ReleaseReconciler{
@@ -260,9 +267,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		S3Client:      s3Client,
-		VsphereClient: vsphereClient,
-		Client:        mgr.GetClient(),
+		S3Client:  s3Client,
+		Providers: providers,
+		Client:    mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)
