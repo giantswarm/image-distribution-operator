@@ -368,7 +368,9 @@ func (c *Client) findUsableHost(ctx context.Context, hosts []*object.HostSystem)
 		return host, nil
 	}
 
-	return nil, fmt.Errorf("no usable hosts found - all hosts are either disconnected, in maintenance mode, or powered off")
+	return nil, fmt.Errorf(
+		"no usable hosts found - all hosts are either disconnected, in maintenance mode, or powered off",
+	)
 }
 
 // getResourcePool returns the resource pool object

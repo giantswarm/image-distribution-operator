@@ -121,4 +121,4 @@ test: ## Runs go test with default values.
 build-docker: build-linux ## Builds docker image to registry.
 	@echo "====> $@"
 	cp -a $(APPLICATION)-linux $(APPLICATION)
-	docker build -t ${APPLICATION}:${VERSION} .
+	docker build -t $(or $(IMG),${APPLICATION}:${VERSION}) .
