@@ -20,7 +20,7 @@ import (
 )
 
 // based on upstream importer package except we use pull instead of push
-func PullImport(ctx context.Context,
+func pullImport(ctx context.Context,
 	fpath string, opts importer.Options, imp *importer.Importer, url string) (*types.ManagedObjectReference, error) {
 
 	o, err := importer.ReadOvf(fpath, imp.Archive)
