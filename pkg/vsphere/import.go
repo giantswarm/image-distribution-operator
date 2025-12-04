@@ -12,12 +12,123 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/ovf"
 	"github.com/vmware/govmomi/ovf/importer"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/types"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// ImporterConfig holds the configuration for the OVF importer
+type ImporterConfig struct {
+	Name         string
+	Datacenter   *object.Datacenter
+	Datastore    *object.Datastore
+	Folder       *object.Folder
+	Host         *object.HostSystem
+	Network      types.ManagedObjectReference
+	ResourcePool *object.ResourcePool
+	Finder       *find.Finder
+	Path         string
+}
+
+// importImage imports an OVF image to vSphere
+func (c *Client) importImage(ctx context.Context, imageURL string, imageName string, loc string) (
+	*types.ManagedObjectReference, error) {
+
+	log := log.FromContext(ctx)
+
+	finder := find.NewFinder(c.vsphere.Client, true)
+
+	dc, err := c.getDatacenter(ctx, finder, loc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datacenter: %w", err)
+	}
+	finder.SetDatacenter(dc)
+
+	datastore, err := c.getDatastore(ctx, finder, loc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get datastore: %w", err)
+	}
+
+	folder, err := c.getFolder(ctx, c.locations[loc].Folder, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+
+	pool, err := c.getResourcePool(ctx, c.locations[loc].Resourcepool, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resource pool: %w", err)
+	}
+
+	host, err := c.getHost(ctx, c.locations[loc].Host, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host: %w", err)
+	}
+
+	network, err := c.getNetwork(ctx, c.locations[loc].Network, finder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get network: %w", err)
+	}
+
+	imageSuffix := c.locations[loc].ImageSuffix
+	if len(imageSuffix) > 0 {
+		imageName = fmt.Sprintf("%s-%s", imageName, imageSuffix)
+	}
+
+	options := &importer.Options{
+		Name: &imageName,
+		NetworkMapping: []importer.Network{
+			{
+				Name:    "nic0",
+				Network: network.String(),
+			},
+		},
+	}
+
+	importer := c.getImporter(
+		ImporterConfig{
+			Name:         imageName,
+			Datacenter:   dc,
+			Datastore:    datastore,
+			Folder:       folder,
+			Host:         host,
+			ResourcePool: pool,
+			Finder:       finder,
+			Path:         imageURL,
+		},
+	)
+
+	log.Info("Importing OVF", "imageURL", imageURL, "imageName", imageName)
+
+	if c.pullMode {
+		log.Info("Pull mode enabled")
+		return pullImport(ctx, "*.ovf", *options, importer, imageURL)
+	}
+	return importer.Import(ctx, "*.ovf", *options)
+}
+
+func (c *Client) getImporter(config ImporterConfig) *importer.Importer {
+	archive := &importer.TapeArchive{Path: config.Path}
+	archive.Client = c.vsphere.Client
+
+	return &importer.Importer{
+		Name:           config.Name,
+		Client:         c.vsphere.Client,
+		Datacenter:     config.Datacenter,
+		Datastore:      config.Datastore,
+		Folder:         config.Folder,
+		Host:           config.Host,
+		ResourcePool:   config.ResourcePool,
+		Finder:         config.Finder,
+		Log:            func(msg string) (int, error) { return fmt.Print(msg) },
+		Archive:        archive,
+		Manifest:       nil, // Placeholder, update if needed
+		VerifyManifest: false,
+	}
+}
 
 // based on upstream importer package except we use pull instead of push
 func pullImport(ctx context.Context,

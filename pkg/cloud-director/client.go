@@ -16,6 +16,7 @@ type Client struct {
 	cloudDirector *govcd.VCDClient
 	url           string
 	location      *Location
+	pullMode      bool
 }
 
 type Credentials struct {
@@ -39,12 +40,6 @@ type Config struct {
 	CredentialsFile string
 	LocationsFile   string
 	PullMode        bool
-}
-
-// ImporterConfig holds the configuration for the OVF importer
-type ImporterConfig struct {
-	Name string
-	Path string
 }
 
 // New initializes a new cloudDirector client
@@ -81,6 +76,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		cloudDirector: vcdClient,
 		url:           creds.URL,
 		location:      location,
+		pullMode:      c.PullMode,
 	}, nil
 }
 
@@ -121,7 +117,31 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 
 // Create imports and processes an OVF image to cloudDirector
 func (c *Client) Create(ctx context.Context, imageURL string, imageName string, loc string) error {
-	return nil
+	log := log.FromContext(ctx)
+
+	// Get the catalog where we'll upload
+	catalog, err := c.getCatalog(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get catalog: %w", err)
+	}
+
+	// Create import configuration
+	importConfig := ImporterConfig{
+		Name:    imageName,
+		Path:    imageURL,
+		Catalog: catalog,
+	}
+
+	log.Info("Starting image import", "name", imageName, "url", imageURL, "pullMode", c.pullMode)
+
+	// Import the image
+	task, err := c.importImage(ctx, importConfig)
+	if err != nil {
+		return fmt.Errorf("failed to import image: %w", err)
+	}
+
+	// Wait for completion
+	return c.waitForTask(ctx, task)
 }
 
 // getOrg returns the organization object
@@ -146,6 +166,20 @@ func (c *Client) getCatalog(ctx context.Context) (*govcd.Catalog, error) {
 			c.location.Catalog, c.location.Org, err)
 	}
 	return catalog, nil
+}
+
+// getVDC returns the VDC object
+func (c *Client) getVDC(ctx context.Context) (*govcd.Vdc, error) {
+	org, err := c.getOrg(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	vdc, err := org.GetVDCByName(c.location.VDC, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VDC %s: %w", c.location.VDC, err)
+	}
+	return vdc, nil
 }
 
 func loadCredentials(path string) (*Credentials, error) {
