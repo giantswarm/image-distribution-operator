@@ -17,6 +17,7 @@ type Client struct {
 	url           string
 	location      *Location
 	pullMode      bool
+	downloadDir   string
 }
 
 type Credentials struct {
@@ -40,6 +41,7 @@ type Config struct {
 	CredentialsFile string
 	LocationsFile   string
 	PullMode        bool
+	DownloadDir     string
 }
 
 // New initializes a new cloudDirector client
@@ -77,6 +79,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		url:           creds.URL,
 		location:      location,
 		pullMode:      c.PullMode,
+		downloadDir:   c.DownloadDir,
 	}, nil
 }
 
@@ -112,6 +115,32 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 
 // Delete deletes an image from cloudDirector
 func (c *Client) Delete(ctx context.Context, name string, loc string) error {
+	log := log.FromContext(ctx)
+
+	catalog, err := c.getCatalog(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get catalog: %w", err)
+	}
+
+	// Get the vApp template
+	vAppTemplate, err := catalog.GetVAppTemplateByName(name)
+	if err != nil {
+		if govcd.ContainsNotFound(err) {
+			log.Info("vApp template not found, nothing to delete", "name", name, "catalog", c.location.Catalog)
+			return nil
+		}
+		return fmt.Errorf("failed to get vApp template %s: %w", name, err)
+	}
+
+	log.Info("Deleting vApp template", "name", name, "catalog", c.location.Catalog)
+
+	// Delete the vApp template
+	err = vAppTemplate.Delete()
+	if err != nil {
+		return fmt.Errorf("failed to delete vApp template %s: %w", name, err)
+	}
+
+	log.Info("Successfully deleted vApp template", "name", name, "catalog", c.location.Catalog)
 	return nil
 }
 
@@ -134,14 +163,14 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 
 	log.Info("Starting image import", "name", imageName, "url", imageURL, "pullMode", c.pullMode)
 
-	// Import the image
-	task, err := c.importImage(ctx, importConfig)
+	// Import the image (waits for completion internally)
+	err = c.importImage(ctx, importConfig)
 	if err != nil {
 		return fmt.Errorf("failed to import image: %w", err)
 	}
 
-	// Wait for completion
-	return c.waitForTask(ctx, task)
+	log.Info("Image import completed", "name", imageName)
+	return nil
 }
 
 // getOrg returns the organization object
