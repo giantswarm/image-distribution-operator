@@ -218,7 +218,8 @@ func TestGetImageKey(t *testing.T) {
 					Provider: "capv",
 				},
 			},
-			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/flatcar-stable-3975.2.0-kube-v1.30.4.ova",
+			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
+				"flatcar-stable-3975.2.0-kube-v1.30.4.ova",
 		},
 		{
 			name: "case 1: cloud-director node image generates correct S3 key",
