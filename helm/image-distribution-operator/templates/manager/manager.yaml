@@ -67,7 +67,7 @@ spec:
           securityContext:
             {{- toYaml .Values.controllerManager.container.securityContext | nindent 12 }}
           volumeMounts:
-            - mountPath: /tmp/images
+            - mountPath: /tmp
               name: image-storage
             {{- if .Values.vsphere.credentials }}
             - mountPath: /home/.vsphere/credentials
