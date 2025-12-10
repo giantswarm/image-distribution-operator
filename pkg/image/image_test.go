@@ -6,8 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 	releases "github.com/giantswarm/release-operator/v4/api/v1alpha1"
+
+	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 )
 
 func TestGetImageProvider(t *testing.T) {
@@ -227,7 +228,8 @@ func TestGetImageKey(t *testing.T) {
 					Provider: "capvcd",
 				},
 			},
-			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/flatcar-stable-3975.2.0-kube-v1.30.4.ova",
+			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
+				"flatcar-stable-3975.2.0-kube-v1.30.4.ova",
 		},
 		{
 			name: "case 2: image with different kubernetes version",
@@ -237,7 +239,8 @@ func TestGetImageKey(t *testing.T) {
 					Provider: "capv",
 				},
 			},
-			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.29.0-tooling-1.18.1-gs/flatcar-stable-3975.2.0-kube-v1.29.0.ova",
+			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.29.0-tooling-1.18.1-gs/" +
+				"flatcar-stable-3975.2.0-kube-v1.29.0.ova",
 		},
 	}
 

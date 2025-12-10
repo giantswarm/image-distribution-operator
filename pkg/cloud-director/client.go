@@ -94,7 +94,7 @@ func (c *Client) GetLocations() map[string]interface{} {
 func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, error) {
 	log := log.FromContext(ctx)
 
-	catalog, err := c.getCatalog(ctx)
+	catalog, err := c.getCatalog()
 	if err != nil {
 		return false, err
 	}
@@ -117,7 +117,7 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 	log := log.FromContext(ctx)
 
-	catalog, err := c.getCatalog(ctx)
+	catalog, err := c.getCatalog()
 	if err != nil {
 		return fmt.Errorf("failed to get catalog: %w", err)
 	}
@@ -149,7 +149,7 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 	log := log.FromContext(ctx)
 
 	// Get the catalog where we'll upload
-	catalog, err := c.getCatalog(ctx)
+	catalog, err := c.getCatalog()
 	if err != nil {
 		return fmt.Errorf("failed to get catalog: %w", err)
 	}
@@ -183,7 +183,7 @@ func (c *Client) getOrg() (*govcd.Org, error) {
 }
 
 // getCatalog returns the catalog object
-func (c *Client) getCatalog(ctx context.Context) (*govcd.Catalog, error) {
+func (c *Client) getCatalog() (*govcd.Catalog, error) {
 	org, err := c.getOrg()
 	if err != nil {
 		return nil, err
