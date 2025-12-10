@@ -282,15 +282,25 @@ func main() {
 		DownloadDir:     vcdDownloadDir,
 	}, context.Background())
 	if err != nil {
-		setupLog.Info("Cloud Director provider not configured - will fail if NodeImage references 'capvcd' provider", "error", err)
+		setupLog.Info(
+			"Cloud Director provider not configured - will fail if NodeImage references 'capvcd' provider",
+			"error", err,
+		)
 	} else {
 		providers["capvcd"] = vcdClient
 		setupLog.Info("Cloud Director provider initialized successfully", "provider", "capvcd")
 	}
 
+	// Create a simpler map for ReleaseReconciler (just provider names)
+	configuredProviders := make(map[string]interface{})
+	for k := range providers {
+		configuredProviders[k] = struct{}{}
+	}
+
 	if err = (&release.ReleaseReconciler{
 		Namespace: namespace,
 		Client:    mgr.GetClient(),
+		Providers: configuredProviders,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
 		os.Exit(1)

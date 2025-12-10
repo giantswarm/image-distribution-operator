@@ -119,13 +119,22 @@ func GetImageKey(nodeImage *images.NodeImage) string {
 	ovaFileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
 	regexp := regexp.MustCompile(`(kube-)(\d+\.\d+\.\d+)`)
 	ovaFileName = regexp.ReplaceAllString(ovaFileName, `${1}v${2}`)
-	return fmt.Sprintf("%s/%s/%s.ova", nodeImage.Spec.Provider, nodeImage.Spec.Name, ovaFileName)
+
+	// Both capv and capvcd images are stored in the capv/ directory in S3
+	s3Provider := nodeImage.Spec.Provider
+	if s3Provider == "capvcd" {
+		s3Provider = "capv"
+	}
+
+	return fmt.Sprintf("%s/%s/%s.ova", s3Provider, nodeImage.Spec.Name, ovaFileName)
 }
 
 func getProviderFromProviderName(providerName string) string {
 	switch providerName {
 	case "vsphere":
 		return "capv"
+	case "cloud-director":
+		return "capvcd"
 	default:
 		return providerName
 	}

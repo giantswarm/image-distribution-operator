@@ -215,6 +215,51 @@
                 }
             }
         },
+        "vcd": {
+            "type": "object",
+            "properties": {
+                "credentials": {
+                    "type": "object",
+                    "properties": {
+                        "insecure": {
+                            "type": "boolean"
+                        },
+                        "org": {
+                            "type": "string"
+                        },
+                        "password": {
+                            "type": "string"
+                        },
+                        "url": {
+                            "type": "string"
+                        },
+                        "username": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "downloadDir": {
+                    "type": "string"
+                },
+                "locations": {
+                    "type": "object",
+                    "properties": {
+                        "catalog": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        },
+                        "vdc": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "pullFromURL": {
+                    "type": "boolean"
+                }
+            }
+        },
         "vsphere": {
             "type": "object",
             "properties": {

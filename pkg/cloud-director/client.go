@@ -174,7 +174,7 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 }
 
 // getOrg returns the organization object
-func (c *Client) getOrg(ctx context.Context) (*govcd.Org, error) {
+func (c *Client) getOrg() (*govcd.Org, error) {
 	org, err := c.cloudDirector.GetOrgByName(c.location.Org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization %s: %w", c.location.Org, err)
@@ -184,7 +184,7 @@ func (c *Client) getOrg(ctx context.Context) (*govcd.Org, error) {
 
 // getCatalog returns the catalog object
 func (c *Client) getCatalog(ctx context.Context) (*govcd.Catalog, error) {
-	org, err := c.getOrg(ctx)
+	org, err := c.getOrg()
 	if err != nil {
 		return nil, err
 	}
@@ -195,20 +195,6 @@ func (c *Client) getCatalog(ctx context.Context) (*govcd.Catalog, error) {
 			c.location.Catalog, c.location.Org, err)
 	}
 	return catalog, nil
-}
-
-// getVDC returns the VDC object
-func (c *Client) getVDC(ctx context.Context) (*govcd.Vdc, error) {
-	org, err := c.getOrg(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	vdc, err := org.GetVDCByName(c.location.VDC, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get VDC %s: %w", c.location.VDC, err)
-	}
-	return vdc, nil
 }
 
 func loadCredentials(path string) (*Credentials, error) {

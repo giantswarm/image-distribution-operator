@@ -18,7 +18,6 @@ package release
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
@@ -39,6 +38,7 @@ const (
 type ReleaseReconciler struct {
 	client.Client
 	Namespace string
+	Providers map[string]interface{}
 }
 
 // +kubebuilder:rbac:groups=release.giantswarm.io,resources=releases,verbs=get;list;watch;update;patch
@@ -65,16 +65,15 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	flatcarChannel := "stable" // TODO: ensure that this is what it is supposed to be or if it comes from somewhere else
 
-	// TODO: we will want to change this later
-	if !strings.HasPrefix(release.Name, "vsphere-") {
-		// For now we exclude all non vsphere releases
-		log.Info("Release " + release.Name + " is not vsphere - excluding")
-		return ctrl.Result{}, nil
-	}
-
 	nodeImage, err := image.GetNodeImageFromRelease(release, flatcarChannel)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Check if the provider for this release is configured
+	if _, ok := r.Providers[nodeImage.Spec.Provider]; !ok {
+		log.Info("Provider not configured - skipping release", "provider", nodeImage.Spec.Provider, "release", release.Name)
+		return ctrl.Result{}, nil
 	}
 
 	imageClient, err := image.New(image.Config{
