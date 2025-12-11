@@ -67,7 +67,6 @@ The VCD credentials and locations are specified inside the `values.yaml` file.
 
 ```yaml
 vcd:
-  pullFromURL: false
   downloadDir: "/tmp/images"
   credentials:
     url: "https://my-vcd-instance.example.com"

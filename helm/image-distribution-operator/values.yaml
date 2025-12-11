@@ -85,7 +85,6 @@ vsphere:
   locations: {}
 
 vcd:
-  pullFromURL: false
   downloadDir: "/tmp/images"
   credentials:
     url: ""

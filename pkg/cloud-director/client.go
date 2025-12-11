@@ -16,7 +16,6 @@ type Client struct {
 	cloudDirector *govcd.VCDClient
 	url           string
 	location      *Location
-	pullMode      bool
 	downloadDir   string
 }
 
@@ -40,7 +39,6 @@ type Location struct {
 type Config struct {
 	CredentialsFile string
 	LocationsFile   string
-	PullMode        bool
 	DownloadDir     string
 }
 
@@ -78,7 +76,6 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		cloudDirector: vcdClient,
 		url:           creds.URL,
 		location:      location,
-		pullMode:      c.PullMode,
 		downloadDir:   c.DownloadDir,
 	}, nil
 }
@@ -161,7 +158,7 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 		Catalog: catalog,
 	}
 
-	log.Info("Starting image import", "name", imageName, "url", imageURL, "pullMode", c.pullMode)
+	log.Info("Starting image import", "name", imageName, "url", imageURL)
 
 	// Import the image (waits for completion internally)
 	err = c.importImage(ctx, importConfig)

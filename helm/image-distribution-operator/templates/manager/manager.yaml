@@ -39,9 +39,6 @@ spec:
             {{- if .Values.vsphere.pullFromURL }}
             - --vsphere-pull-from-url
             {{- end }}
-            {{- if .Values.vcd.pullFromURL }}
-            - --vcd-pull-from-url
-            {{- end }}
             {{- if .Values.vcd.downloadDir }}
             - --vcd-download-dir={{ .Values.vcd.downloadDir }}
             {{- end }}

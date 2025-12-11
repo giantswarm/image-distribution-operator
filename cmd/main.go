@@ -85,7 +85,6 @@ func main() {
 
 	var vcdCredentials string
 	var vcdLocations string
-	var vcdPullFromURL bool
 	var vcdDownloadDir string
 
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
@@ -104,10 +103,8 @@ func main() {
 		"The file containing the credentials for VMware Cloud Director resources.")
 	flag.StringVar(&vcdLocations, "vcd-locations", "/home/.vcd/locations",
 		"The file containing the locations for VMware Cloud Director resources.")
-	flag.BoolVar(&vcdPullFromURL, "vcd-pull-from-url", false,
-		"Use pull mode for VCD images. This will pull the image from the URL instead of uploading to Cloud Director.")
 	flag.StringVar(&vcdDownloadDir, "vcd-download-dir", "/tmp/images",
-		"The directory where VCD images are downloaded when pull mode is disabled.")
+		"The directory where VCD images are downloaded.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -278,7 +275,6 @@ func main() {
 	vcdClient, err := clouddirector.New(clouddirector.Config{
 		CredentialsFile: vcdCredentials,
 		LocationsFile:   vcdLocations,
-		PullMode:        vcdPullFromURL,
 		DownloadDir:     vcdDownloadDir,
 	}, context.Background())
 	if err != nil {

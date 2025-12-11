@@ -18,41 +18,9 @@ type ImporterConfig struct {
 	Catalog *govcd.Catalog
 }
 
-// importImage handles the actual import (pull vs push) and waits for completion
+// importImage handles the actual import using push mode and waits for completion
 func (c *Client) importImage(ctx context.Context, config ImporterConfig) error {
-	log := log.FromContext(ctx)
-
-	if c.pullMode {
-		log.Info("Pull mode enabled", "url", config.Path)
-		return c.pullImport(ctx, config)
-	}
 	return c.pushImport(ctx, config)
-}
-
-// pullImport uses cloud director's pull-based import (cloud director fetches from URL)
-func (c *Client) pullImport(ctx context.Context, config ImporterConfig) error {
-	log := log.FromContext(ctx)
-
-	// cloud director pulls directly from the URL
-	task, err := config.Catalog.UploadOvfByLink(
-		config.Path, // ovfUrl - the S3 URL
-		config.Name, // itemName
-		fmt.Sprintf("Node image %s", config.Name), // description
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start pull import: %w", err)
-	}
-
-	log.Info("Pull import started", "name", config.Name, "taskHREF", task.Task.HREF, "waiting for completion")
-
-	// Wait for task completion
-	err = task.WaitTaskCompletion()
-	if err != nil {
-		return fmt.Errorf("pull import task failed: %w", err)
-	}
-
-	log.Info("Pull import completed successfully", "name", config.Name)
-	return nil
 }
 
 // pushImport uses push-based upload (operator downloads then uploads)
