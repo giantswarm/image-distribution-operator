@@ -83,6 +83,20 @@ vsphere:
     password: ""
     vcenter: ""
   locations: {}
+
+vcd:
+  downloadDir: "/tmp/images"
+  credentials:
+    url: ""
+    username: ""
+    password: ""
+    org: ""
+    insecure: false
+  locations:
+    name: ""
+    vdc: ""
+    catalog: ""
+
 s3:
   bucket: ""
   region: ""

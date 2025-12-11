@@ -61,6 +61,26 @@ vsphere:
       imagesuffix: "my-suffix" # Optional
 ```
 
+### VMware Cloud Director Client
+The `image-controller` can upload images to VMware Cloud Director (VCD) catalogs.
+The VCD credentials and locations are specified inside the `values.yaml` file.
+
+```yaml
+vcd:
+  downloadDir: "/tmp/images"
+  credentials:
+    url: "https://my-vcd-instance.example.com"
+    username: "my-username"
+    password: "my-password"
+    org: "my-org"
+    insecure: false
+  locations:
+    name: "my-location"
+    org: "my-org"
+    vdc: "my-vdc"
+    catalog: "my-catalog"
+```
+
 ## Getting Started
 
 ### Network requirements

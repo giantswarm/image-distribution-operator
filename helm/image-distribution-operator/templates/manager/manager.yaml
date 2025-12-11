@@ -39,6 +39,9 @@ spec:
             {{- if .Values.vsphere.pullFromURL }}
             - --vsphere-pull-from-url
             {{- end }}
+            {{- if .Values.vcd.downloadDir }}
+            - --vcd-download-dir={{ .Values.vcd.downloadDir }}
+            {{- end }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"
@@ -61,14 +64,28 @@ spec:
           securityContext:
             {{- toYaml .Values.controllerManager.container.securityContext | nindent 12 }}
           volumeMounts:
-            - mountPath: /tmp/images
+            - mountPath: /tmp
               name: image-storage
+            {{- if .Values.vsphere.credentials }}
             - mountPath: /home/.vsphere/credentials
-              name: credentials
+              name: vsphere-credentials
               subPath: credentials
+            {{- end }}
+            {{- if .Values.vsphere.locations }}
             - mountPath: /home/.vsphere/locations
-              name: locations
+              name: vsphere-locations
               subPath: locations
+            {{- end }}
+            {{- if .Values.vcd.credentials }}
+            - mountPath: /home/.vcd/credentials
+              name: vcd-credentials
+              subPath: credentials
+            {{- end }}
+            {{- if .Values.vcd.locations }}
+            - mountPath: /home/.vcd/locations
+              name: vcd-locations
+              subPath: locations
+            {{- end }}
             {{- if and .Values.metrics.enable .Values.certmanager.enable }}
             - name: metrics-certs
               mountPath: /tmp/k8s-metrics-server/metrics-certs
@@ -81,12 +98,26 @@ spec:
       volumes:
         - name: image-storage
           emptyDir: {}
-        - name: credentials
+        {{- if .Values.vsphere.credentials }}
+        - name: vsphere-credentials
           secret:
             secretName: image-distribution-operator-vsphere-credentials
-        - name: locations
+        {{- end }}
+        {{- if .Values.vsphere.locations }}
+        - name: vsphere-locations
           configMap:
             name: image-distribution-operator-vsphere-locations
+        {{- end }}
+        {{- if .Values.vcd.credentials }}
+        - name: vcd-credentials
+          secret:
+            secretName: image-distribution-operator-vcd-credentials
+        {{- end }}
+        {{- if .Values.vcd.locations }}
+        - name: vcd-locations
+          configMap:
+            name: image-distribution-operator-vcd-locations
+        {{- end }}
         {{- if and .Values.metrics.enable .Values.certmanager.enable }}
         - name: metrics-certs
           secret:

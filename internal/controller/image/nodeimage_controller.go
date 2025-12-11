@@ -129,12 +129,13 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Get the provider for this NodeImage
 	prov, ok := r.Providers[nodeImage.Spec.Provider]
 	if !ok {
-		err := fmt.Errorf("provider %s is not configured - check operator configuration", nodeImage.Spec.Provider)
-		log.Error(err, "Provider not available", "provider", nodeImage.Spec.Provider)
-		if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-			return ctrl.Result{}, fmt.Errorf("provider not configured: %w\nfailed to update status: %w", err, statusErr)
+		log.Info("Provider not configured - skipping NodeImage reconciliation", "provider", nodeImage.Spec.Provider, "nodeImage", nodeImage.Name)
+		// Mark as error to indicate configuration issue
+		// This gives users visibility that the provider needs to be configured
+		if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update status for unconfigured provider: %w", err)
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// Process image for all locations in the provider

@@ -1,12 +1,12 @@
-{{- if .Values.vsphere.locations }}
+{{- if .Values.vcd.locations }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   labels:
     {{- include "chart.labels" . | nindent 4 }}
-  name: image-distribution-operator-vsphere-locations
+  name: image-distribution-operator-vcd-locations
   namespace: {{ .Release.Namespace }}
 data:
   locations: |-
-    {{- .Values.vsphere.locations | toYaml | nindent 4 }}
+    {{- .Values.vcd.locations | toYaml | nindent 4 }}
 {{- end }}
