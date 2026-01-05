@@ -63,25 +63,25 @@ $(APPLICATION)-windows-amd64.exe: $(APPLICATION)-v$(VERSION)-windows-amd64.exe
 
 $(APPLICATION)-v$(VERSION)-%-amd64: $(SOURCES)
 	@echo "====> $@"
-	CGO_ENABLED=0 GOOS=$* GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd
+	CGO_ENABLED=0 GOOS=$* GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ .
 
 $(APPLICATION)-v$(VERSION)-%-arm64: $(SOURCES)
 	@echo "====> $@"
-	CGO_ENABLED=0 GOOS=$* GOARCH=arm64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd
+	CGO_ENABLED=0 GOOS=$* GOARCH=arm64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ .
 
 $(APPLICATION)-v$(VERSION)-windows-amd64.exe: $(SOURCES)
 	@echo "====> $@"
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ ./cmd
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(LDFLAGS)" -o $@ .
 
 .PHONY: install
 install: ## Install the application.
 	@echo "====> $@"
-	go install -ldflags "$(LDFLAGS)" ./cmd
+	go install -ldflags "$(LDFLAGS)" .
 
 .PHONY: run
 run: ## Runs go run main.go.
 	@echo "====> $@"
-	go run -ldflags "$(LDFLAGS)" -race ./cmd
+	go run -ldflags "$(LDFLAGS)" -race .
 
 .PHONY: clean
 clean: ## Cleans the binary.
@@ -121,4 +121,4 @@ test: ## Runs go test with default values.
 build-docker: build-linux ## Builds docker image to registry.
 	@echo "====> $@"
 	cp -a $(APPLICATION)-linux $(APPLICATION)
-	docker build -t $(or $(IMG),${APPLICATION}:${VERSION}) .
+	docker build -t ${APPLICATION}:${VERSION} .
