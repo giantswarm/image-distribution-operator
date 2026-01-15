@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	releases "github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	releases "github.com/giantswarm/releases/sdk/api/v1alpha1"
 
 	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
 )
