@@ -3,6 +3,11 @@ version: "2"
 run:
   allow-parallel-runners: true
 
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
 linters:
   default: none
   enable:
@@ -12,8 +17,6 @@ linters:
     - ginkgolinter
     - goconst
     - gocyclo
-    - gofmt
-    - goimports
     - govet
     - ineffassign
     - lll
