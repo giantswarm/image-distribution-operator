@@ -4,7 +4,7 @@ run:
   allow-parallel-runners: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - copyloopvar
     - dupl
@@ -25,11 +25,10 @@ linters:
     - unconvert
     - unparam
     - unused
-
-linters-settings:
-  revive:
-    rules:
-      - name: comment-spacings
+  settings:
+    revive:
+      rules:
+        - name: comment-spacings
 
 issues:
   exclude-dirs:
