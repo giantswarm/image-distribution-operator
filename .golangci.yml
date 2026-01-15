@@ -29,15 +29,14 @@ linters:
     revive:
       rules:
         - name: comment-spacings
-
-issues:
-  exclude-dirs:
-    - test
-  exclude-rules:
-    - path: api/.*
-      linters:
-        - lll
-    - path: internal/.*
-      linters:
-        - dupl
-        - lll
+  exclusions:
+    paths:
+      - test
+    rules:
+      - path: api/.*
+        linters:
+          - lll
+      - path: internal/.*
+        linters:
+          - dupl
+          - lll
