@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace `github.com/giantswarm/release-operator/v4/api/v1alpha1` with `github.com/giantswarm/releases/sdk/api/v1alpha1` for Release CRD types.
+- Update Go to 1.25 and k8s dependencies to v0.35.0.
+- Update golangci-lint to v2.8.0.
+
 ## [0.5.0] - 2025-12-11
 
 ### Added

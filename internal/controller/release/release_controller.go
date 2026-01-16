@@ -22,7 +22,7 @@ import (
 
 	"github.com/giantswarm/image-distribution-operator/pkg/image"
 
-	"github.com/giantswarm/release-operator/v4/api/v1alpha1"
+	"github.com/giantswarm/releases/sdk/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"

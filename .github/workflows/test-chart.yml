@@ -32,7 +32,7 @@ jobs:
       - name: Prepare kubebuilder
         run: |
           go mod tidy
-          make build-docker IMG=kubebuilder:v0.1.0
+          docker build -t kubebuilder:v0.1.0 .
           kind load docker-image kubebuilder:v0.1.0
 
       - name: Install Helm

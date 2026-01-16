@@ -82,27 +82,27 @@ func (c *Client) downloadImage(ctx context.Context, imageURL string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	// Download from URL
 	log.Info("Downloading image", "url", imageURL, "dest", tmpFile.Name())
 
 	resp, err := http.Get(imageURL) // #nosec G107 - URL is from trusted source (Release CR)
 	if err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to download: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("download failed with status: %d", resp.StatusCode)
 	}
 
 	// Copy to file
 	written, err := io.Copy(tmpFile, resp.Body)
 	if err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 
