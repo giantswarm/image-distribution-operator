@@ -1,2 +1,1 @@
-# golang/k8s.io/apiserver@v0.32.3
-CVE-2020-8561 until=2025-05-01
+CVE-2026-24051 until=2026-03-06 # go.opentelemetry.io/otel/sdk@v1.34.0
