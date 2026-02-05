@@ -134,6 +134,10 @@ func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 	// Delete the vApp template
 	err = vAppTemplate.Delete()
 	if err != nil {
+		if govcd.ContainsNotFound(err) {
+			log.Info("vApp template already deleted or not found", "name", name, "catalog", c.location.Catalog)
+			return nil
+		}
 		return fmt.Errorf("failed to delete vApp template %s: %w", name, err)
 	}
 
