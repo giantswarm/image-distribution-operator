@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chanaged
+
+- Calculate image tag from appVersion field.
+- Switch labels to opencontainers format.
+- Enable replacement of appVersion field in Chart.yaml.
+
 ## [0.5.1] - 2026-02-05
 
 ### Changed
