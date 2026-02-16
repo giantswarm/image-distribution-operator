@@ -6,4 +6,4 @@ version: 0.5.1
 appVersion: "0.1.0"
 icon: https://s.giantswarm.io/app-icons/giantswarm/1/light.svg
 annotations:
-  application.giantswarm.io/team: "rocket"
+  io.giantswarm.application.team: "rocket"
