@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update module gopkg.in/yaml from v2 to v3.
+
 ## [0.5.2] - 2026-02-17
 
 ### Changed
