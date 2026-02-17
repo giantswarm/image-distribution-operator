@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
