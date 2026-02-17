@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Switch labels to opencontainers format.
 - Enable replacement of appVersion field in Chart.yaml.
 - Update Architect orb to 6.12.0.
+- Migrate RBAC to use new events API.
 
 ## [0.5.1] - 2026-02-05
 
