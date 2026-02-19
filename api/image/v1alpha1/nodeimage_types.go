@@ -38,10 +38,10 @@ type NodeImageSpec struct {
 type NodeImageState string
 
 const (
-	NodeImagePending   NodeImageState = "Pending"
-	NodeImageUploading NodeImageState = "Uploading"
-	NodeImageAvailable NodeImageState = "Available"
-	NodeImageError     NodeImageState = "Error"
+	NodeImagePending          NodeImageState = "Pending"
+	NodeImageUploading        NodeImageState = "Uploading"
+	NodeImageAvailable        NodeImageState = "Available"
+	NodeImageError            NodeImageState = "Error"
 	NodeImageDeleting         NodeImageState = "Deleting"
 	NodeImageDeleted          NodeImageState = "Deleted"
 	NodeImageMissing          NodeImageState = "Missing"
