@@ -42,9 +42,10 @@ const (
 	NodeImageUploading NodeImageState = "Uploading"
 	NodeImageAvailable NodeImageState = "Available"
 	NodeImageError     NodeImageState = "Error"
-	NodeImageDeleting  NodeImageState = "Deleting"
-	NodeImageDeleted   NodeImageState = "Deleted"
-	NodeImageMissing   NodeImageState = "Missing"
+	NodeImageDeleting         NodeImageState = "Deleting"
+	NodeImageDeleted          NodeImageState = "Deleted"
+	NodeImageMissing          NodeImageState = "Missing"
+	NodeImageAwaitingDeletion NodeImageState = "AwaitingDeletion"
 )
 
 // NodeImageStatus defines the observed state of NodeImage.
@@ -57,6 +58,9 @@ type NodeImageStatus struct {
 
 	// State is the state that the image is currently in
 	State NodeImageState `json:"state"`
+
+	// LastUsed is the time when the image was last used
+	LastUsed *metav1.Time `json:"lastUsed,omitempty"`
 }
 
 // +kubebuilder:object:root=true

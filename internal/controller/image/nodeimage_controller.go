@@ -41,8 +41,9 @@ const (
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	S3Client  *s3.Client
-	Providers map[string]provider.Provider
+	S3Client             *s3.Client
+	Providers            map[string]provider.Provider
+	ImageRetentionPeriod time.Duration
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -114,6 +115,25 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, err
 		}
 		log.Info("Finalizer added to NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+	}
+
+	// Check if the image is awaiting deletion
+	if nodeImage.Status.State == imagev1alpha1.NodeImageAwaitingDeletion {
+		if nodeImage.Status.LastUsed != nil {
+			expirationTime := nodeImage.Status.LastUsed.Add(r.ImageRetentionPeriod)
+			if time.Now().After(expirationTime) {
+				log.Info("Image retention period expired - deleting NodeImage", "nodeImage", nodeImage.Name)
+				if err := r.Delete(ctx, nodeImage); err != nil {
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
+
+			// Requeue after expiration
+			requeueAfter := time.Until(expirationTime)
+			log.Info("Image awaiting deletion", "nodeImage", nodeImage.Name, "requeueAfter", requeueAfter)
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		}
 	}
 
 	// Get the URL of the image

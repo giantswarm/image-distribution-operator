@@ -3,8 +3,10 @@ package image
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -74,7 +76,7 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 	return i.Client.Status().Update(ctx, object)
 }
 
-func (i *Client) DeleteImage(ctx context.Context, image string) error {
+func (i *Client) DeleteImage(ctx context.Context, image string, retentionPeriod time.Duration) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object
@@ -91,6 +93,19 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 
 	// If there are still releases in the list, nothing to do
 	if len(object.Status.Releases) > 0 {
+		return nil
+	}
+
+	// Check if we should retain the image
+	if retentionPeriod > 0 {
+		// update state to AwaitingDeletion if not already
+		if object.Status.State != images.NodeImageAwaitingDeletion {
+			object.Status.State = images.NodeImageAwaitingDeletion
+			now := metav1.Now()
+			object.Status.LastUsed = &now
+			log.Info("Marking node image for deletion", "nodeImage", object.Name, "retentionPeriod", retentionPeriod)
+			return i.Client.Status().Update(ctx, object)
+		}
 		return nil
 	}
 
@@ -134,9 +149,10 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
-	// If the State is empty, set it to Pending
-	if object.Status.State == "" {
+	// If the State is empty or AwaitingDeletion, set it to Pending
+	if object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion {
 		object.Status.State = images.NodeImagePending
+		object.Status.LastUsed = nil
 	}
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
