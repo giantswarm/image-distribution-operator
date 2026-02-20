@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update module gopkg.in/yaml from v2 to v3.
+- Fix the helm templating logic for the `helm.sh/chart` label.
 
 ## [0.5.2] - 2026-02-17
 
