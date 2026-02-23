@@ -119,20 +119,23 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Check if the image is awaiting deletion
 	if nodeImage.Status.State == imagev1alpha1.NodeImageAwaitingDeletion {
-		if nodeImage.Status.LastUsed != nil {
-			expirationTime := nodeImage.Status.LastUsed.Add(r.ImageRetentionPeriod)
-			if time.Now().After(expirationTime) {
-				log.Info("Image retention period expired - deleting NodeImage", "nodeImage", nodeImage.Name)
-				if err := r.Delete(ctx, nodeImage); err != nil {
-					return ctrl.Result{}, err
+		if lastUsedStr, ok := nodeImage.Annotations[image.LastUsedAnnotation]; ok {
+			lastUsedTime, err := time.Parse(time.RFC3339, lastUsedStr)
+			if err == nil {
+				expirationTime := lastUsedTime.Add(r.ImageRetentionPeriod)
+				if time.Now().After(expirationTime) {
+					log.Info("Image retention period expired - deleting NodeImage", "nodeImage", nodeImage.Name)
+					if err := r.Delete(ctx, nodeImage); err != nil {
+						return ctrl.Result{}, err
+					}
+					return ctrl.Result{}, nil
 				}
-				return ctrl.Result{}, nil
-			}
 
-			// Requeue after expiration
-			requeueAfter := time.Until(expirationTime)
-			log.Info("Image awaiting deletion", "nodeImage", nodeImage.Name, "requeueAfter", requeueAfter)
-			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+				// Requeue after expiration
+				requeueAfter := time.Until(expirationTime)
+				log.Info("Image awaiting deletion", "nodeImage", nodeImage.Name, "requeueAfter", requeueAfter)
+				return ctrl.Result{RequeueAfter: requeueAfter}, nil
+			}
 		}
 	}
 

@@ -58,9 +58,6 @@ type NodeImageStatus struct {
 
 	// State is the state that the image is currently in
 	State NodeImageState `json:"state"`
-
-	// LastUsed is the time when the image was last used
-	LastUsed *metav1.Time `json:"lastUsed,omitempty"`
 }
 
 // +kubebuilder:object:root=true

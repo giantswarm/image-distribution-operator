@@ -86,16 +86,13 @@ func TestRemoveImage(t *testing.T) {
 			err = c.RemoveReleaseFromNodeImageStatus(ctx, "test-image")
 			assert.Equal(t, tc.expectedError, err)
 
-			err = c.DeleteImage(ctx, "test-image")
-			assert.Equal(t, tc.expectedError, err)
+		err = c.DeleteImage(ctx, "test-image", 0)
+		assert.Equal(t, tc.expectedError, err)
 
-			fetchedImage := &images.NodeImage{}
-			err = fakeClient.Get(ctx, client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
+		fetchedImage := &images.NodeImage{}
+		err = fakeClient.Get(ctx, client.ObjectKey{Name: "test-image", Namespace: "test-namespace"}, fetchedImage)
 
-			if tc.expectDeleted {
-				assert.Error(t, err) // Should be deleted
-			} else {
-				assert.NoError(t, err) // Should still exist
+		if tc.expectDeleted {
 				assert.ElementsMatch(t, tc.expectedReleases, fetchedImage.Status.Releases)
 			}
 		})

@@ -6,11 +6,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+)
+
+const (
+	LastUsedAnnotation = "image-distribution-operator.giantswarm.io/last-used"
 )
 
 // Config is a struct that holds the configuration for the Client
@@ -101,9 +104,15 @@ func (i *Client) DeleteImage(ctx context.Context, image string, retentionPeriod 
 		// update state to AwaitingDeletion if not already
 		if object.Status.State != images.NodeImageAwaitingDeletion {
 			object.Status.State = images.NodeImageAwaitingDeletion
-			now := metav1.Now()
-			object.Status.LastUsed = &now
+			// Set last used annotation
+			if object.Annotations == nil {
+				object.Annotations = make(map[string]string)
+			}
+			object.Annotations[LastUsedAnnotation] = time.Now().Format(time.RFC3339)
 			log.Info("Marking node image for deletion", "nodeImage", object.Name, "retentionPeriod", retentionPeriod)
+			if err := i.Client.Update(ctx, object); err != nil {
+				return err
+			}
 			return i.Client.Status().Update(ctx, object)
 		}
 		return nil
@@ -149,10 +158,19 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
-	// If the State is empty or AwaitingDeletion, set it to Pending
+	// If the State is empty or AwaitingDeletion, set it to Pending and remove last used annotation
 	if object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion {
 		object.Status.State = images.NodeImagePending
-		object.Status.LastUsed = nil
+		// Remove last used annotation if it exists
+		if object.Annotations != nil {
+			if _, exists := object.Annotations[LastUsedAnnotation]; exists {
+				delete(object.Annotations, LastUsedAnnotation)
+				// Update metadata first to clear annotation
+				if err := i.Client.Update(ctx, object); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)

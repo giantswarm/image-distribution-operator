@@ -39,11 +39,4 @@ rules:
   verbs:
   - create
   - patch
-- apiGroups:
-  - "events.k8s.io"
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
 {{- end -}}
