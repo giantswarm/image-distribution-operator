@@ -76,7 +76,7 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 	}
 	// Update the object
 	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Status().Update(ctx, object)
+	return i.Status().Update(ctx, object)
 }
 
 func (i *Client) DeleteImage(ctx context.Context, image string, retentionPeriod time.Duration) error {
@@ -110,10 +110,10 @@ func (i *Client) DeleteImage(ctx context.Context, image string, retentionPeriod 
 			}
 			object.Annotations[LastUsedAnnotation] = time.Now().Format(time.RFC3339)
 			log.Info("Marking node image for deletion", "nodeImage", object.Name, "retentionPeriod", retentionPeriod)
-			if err := i.Client.Update(ctx, object); err != nil {
+			if err := i.Update(ctx, object); err != nil {
 				return err
 			}
-			return i.Client.Status().Update(ctx, object)
+			return i.Status().Update(ctx, object)
 		}
 		return nil
 	}
@@ -166,7 +166,7 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 			if _, exists := object.Annotations[LastUsedAnnotation]; exists {
 				delete(object.Annotations, LastUsedAnnotation)
 				// Update metadata first to clear annotation
-				if err := i.Client.Update(ctx, object); err != nil {
+				if err := i.Update(ctx, object); err != nil {
 					return err
 				}
 			}
@@ -174,5 +174,5 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	}
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Status().Update(ctx, object)
+	return i.Status().Update(ctx, object)
 }

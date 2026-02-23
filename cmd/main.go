@@ -107,7 +107,8 @@ func main() {
 		"The file containing the locations for VMware Cloud Director resources.")
 	flag.StringVar(&vcdDownloadDir, "vcd-download-dir", "/tmp/images",
 		"The directory where VCD images are downloaded.")
-	flag.DurationVar(&imageRetentionPeriod, "image-retention-period", 0, "The duration for which unused images are retained before deletion.")
+	flag.DurationVar(&imageRetentionPeriod, "image-retention-period", 0,
+		"The duration for which unused images are retained before deletion.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
