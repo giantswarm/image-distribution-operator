@@ -76,6 +76,10 @@ certmanager:
 networkPolicy:
   enable: false
 
+# [IMAGE RETENTION]: Duration for which unused images are retained before deletion.
+# Example values: "720h" (30 days), "2160h" (90 days)
+imageRetentionPeriod: "0"
+
 vsphere:
   pullFromURL: false
   credentials:

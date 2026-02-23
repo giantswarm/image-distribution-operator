@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `imageRetentionPeriod` helm value to configure delay of cleanup of unused images.
+
 ## [0.6.0] - 2026-02-20
 
 ### Changed

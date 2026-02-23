@@ -166,6 +166,9 @@
                 }
             }
         },
+        "imageRetentionPeriod": {
+            "type": "string"
+        },
         "metrics": {
             "type": "object",
             "properties": {
