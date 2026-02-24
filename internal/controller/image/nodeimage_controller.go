@@ -139,6 +139,31 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	// If no releases reference this image, initiate deletion.
+	// Guard with state != "" to avoid acting on brand-new objects before the
+	// release controller has had a chance to register the first release.
+	if len(nodeImage.Status.Releases) == 0 && nodeImage.Status.State != "" {
+		if r.ImageRetentionPeriod > 0 {
+			if nodeImage.Annotations == nil {
+				nodeImage.Annotations = make(map[string]string)
+			}
+			nodeImage.Annotations[image.LastUsedAnnotation] = time.Now().Format(time.RFC3339)
+			if err := r.Update(ctx, nodeImage); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAwaitingDeletion); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("No releases reference this image - marking for deletion", "nodeImage", nodeImage.Name, "retentionPeriod", r.ImageRetentionPeriod)
+			return ctrl.Result{RequeueAfter: r.ImageRetentionPeriod}, nil
+		}
+		log.Info("No releases reference this image - deleting", "nodeImage", nodeImage.Name)
+		if err := r.Delete(ctx, nodeImage); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// Get the URL of the image
 	imageKey := image.GetImageKey(nodeImage)
 	url := r.S3Client.GetURL(imageKey)
