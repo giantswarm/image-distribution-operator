@@ -41,8 +41,9 @@ const (
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
 	client.Client
-	S3Client  *s3.Client
-	Providers map[string]provider.Provider
+	S3Client             *s3.Client
+	Providers            map[string]provider.Provider
+	ImageRetentionPeriod time.Duration
 }
 
 // +kubebuilder:rbac:groups=image.giantswarm.io,resources=nodeimages,verbs=get;list;watch;create;update;patch;delete
@@ -62,49 +63,12 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Fetch the NodeImage instance
 	nodeImage := &imagev1alpha1.NodeImage{}
-	err := r.Get(ctx, req.NamespacedName, nodeImage)
-	if err != nil {
+	if err := r.Get(ctx, req.NamespacedName, nodeImage); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Handle deletion
 	if IsDeleted(nodeImage) {
-		log.Info("NodeImage is being deleted", "nodeImage", nodeImage.Name)
-
-		// Get the provider for this NodeImage
-		prov, ok := r.Providers[nodeImage.Spec.Provider]
-		if !ok {
-			log.Info("Provider not configured - skipping deletion", "provider", nodeImage.Spec.Provider)
-			// Remove finalizer even if provider is not configured
-			if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
-				controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
-				if err := r.Update(ctx, nodeImage); err != nil {
-					return ctrl.Result{}, err
-				}
-				log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
-			}
-			return ctrl.Result{}, nil
-		}
-
-		// Delete from all locations
-		for loc := range prov.GetLocations() {
-			if err := r.DeleteProvider(ctx, nodeImage, loc, prov); err != nil {
-				if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
-				}
-				return ctrl.Result{}, err
-			}
-		}
-
-		// Remove finalizer
-		if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
-			controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
-			if err := r.Update(ctx, nodeImage); err != nil {
-				return ctrl.Result{}, err
-			}
-			log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
-		}
-		return ctrl.Result{}, nil
+		return r.handleDeletion(ctx, nodeImage)
 	}
 
 	// Add finalizer
@@ -114,6 +78,14 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, err
 		}
 		log.Info("Finalizer added to NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+	}
+
+	if result, handled, err := r.handleAwaitingDeletion(ctx, nodeImage); handled {
+		return result, err
+	}
+
+	if result, handled, err := r.handleNoReleases(ctx, nodeImage); handled {
+		return result, err
 	}
 
 	// Get the URL of the image
@@ -157,6 +129,101 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	return DefaultRequeue(), nil
+}
+
+func (r *NodeImageReconciler) handleDeletion(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) (ctrl.Result, error) {
+	log := log.FromContext(ctx)
+	log.Info("NodeImage is being deleted", "nodeImage", nodeImage.Name)
+
+	prov, ok := r.Providers[nodeImage.Spec.Provider]
+	if !ok {
+		log.Info("Provider not configured - skipping deletion", "provider", nodeImage.Spec.Provider)
+		if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
+			controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
+			if err := r.Update(ctx, nodeImage); err != nil {
+				return ctrl.Result{}, err
+			}
+			log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+		}
+		return ctrl.Result{}, nil
+	}
+
+	for loc := range prov.GetLocations() {
+		if err := r.DeleteProvider(ctx, nodeImage, loc, prov); err != nil {
+			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to delete node image: %w\nfailed to update status: %w", err, statusErr)
+			}
+			return ctrl.Result{}, err
+		}
+	}
+
+	if controllerutil.ContainsFinalizer(nodeImage, NodeImageFinalizer) {
+		controllerutil.RemoveFinalizer(nodeImage, NodeImageFinalizer)
+		if err := r.Update(ctx, nodeImage); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Info("Finalizer removed from NodeImage", "finalizer", NodeImageFinalizer, "nodeImage", nodeImage.Name)
+	}
+	return ctrl.Result{}, nil
+}
+
+// handleAwaitingDeletion checks whether a NodeImage in the AwaitingDeletion state has
+// passed its retention period and acts accordingly. Returns handled=true when the
+// reconcile loop should stop after this call.
+func (r *NodeImageReconciler) handleAwaitingDeletion(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) (ctrl.Result, bool, error) {
+	if nodeImage.Status.State != imagev1alpha1.NodeImageAwaitingDeletion {
+		return ctrl.Result{}, false, nil
+	}
+
+	log := log.FromContext(ctx)
+	lastUsedStr, ok := nodeImage.Annotations[image.LastUsedAnnotation]
+	if !ok {
+		return ctrl.Result{}, false, nil
+	}
+
+	lastUsedTime, err := time.Parse(time.RFC3339, lastUsedStr)
+	if err != nil {
+		return ctrl.Result{}, false, nil
+	}
+
+	expirationTime := lastUsedTime.Add(r.ImageRetentionPeriod)
+	if time.Now().After(expirationTime) {
+		log.Info("Image retention period expired - deleting NodeImage", "nodeImage", nodeImage.Name)
+		return ctrl.Result{}, true, r.Delete(ctx, nodeImage)
+	}
+
+	requeueAfter := time.Until(expirationTime)
+	log.Info("Image awaiting deletion", "nodeImage", nodeImage.Name, "requeueAfter", requeueAfter)
+	return ctrl.Result{RequeueAfter: requeueAfter}, true, nil
+}
+
+// handleNoReleases initiates deletion when no releases reference this image.
+// Guard with state != "" to avoid acting on brand-new objects before the
+// release controller has had a chance to register the first release.
+// Returns handled=true when the reconcile loop should stop after this call.
+func (r *NodeImageReconciler) handleNoReleases(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) (ctrl.Result, bool, error) {
+	if len(nodeImage.Status.Releases) != 0 || nodeImage.Status.State == "" {
+		return ctrl.Result{}, false, nil
+	}
+
+	log := log.FromContext(ctx)
+	if r.ImageRetentionPeriod > 0 {
+		if nodeImage.Annotations == nil {
+			nodeImage.Annotations = make(map[string]string)
+		}
+		nodeImage.Annotations[image.LastUsedAnnotation] = time.Now().Format(time.RFC3339)
+		if err := r.Update(ctx, nodeImage); err != nil {
+			return ctrl.Result{}, true, err
+		}
+		if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAwaitingDeletion); err != nil {
+			return ctrl.Result{}, true, err
+		}
+		log.Info("No releases reference this image - marking for deletion", "nodeImage", nodeImage.Name, "retentionPeriod", r.ImageRetentionPeriod)
+		return ctrl.Result{RequeueAfter: r.ImageRetentionPeriod}, true, nil
+	}
+
+	log.Info("No releases reference this image - deleting", "nodeImage", nodeImage.Name)
+	return ctrl.Result{}, true, r.Delete(ctx, nodeImage)
 }
 
 func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string, prov provider.Provider) error {

@@ -37,8 +37,9 @@ const (
 // ReleaseReconciler reconciles a Release object
 type ReleaseReconciler struct {
 	client.Client
-	Namespace string
-	Providers map[string]interface{}
+	Namespace            string
+	Providers            map[string]interface{}
+	ImageRetentionPeriod time.Duration
 }
 
 // +kubebuilder:rbac:groups=release.giantswarm.io,resources=releases,verbs=get;list;watch;update;patch
@@ -95,7 +96,7 @@ func (r *ReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		// Handle deletion
-		if err := imageClient.DeleteImage(ctx, nodeImage.Name); err != nil {
+		if err := imageClient.DeleteImage(ctx, nodeImage.Name, r.ImageRetentionPeriod); err != nil {
 			return ctrl.Result{}, err
 		}
 

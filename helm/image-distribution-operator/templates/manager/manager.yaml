@@ -42,6 +42,9 @@ spec:
             {{- if .Values.vcd.downloadDir }}
             - --vcd-download-dir={{ .Values.vcd.downloadDir }}
             {{- end }}
+            {{- if .Values.imageRetentionPeriod }}
+            - --image-retention-period={{ .Values.imageRetentionPeriod }}
+            {{- end }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"
