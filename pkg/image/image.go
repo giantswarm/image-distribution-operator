@@ -114,6 +114,13 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 }
 
 func GetImageKey(nodeImage *images.NodeImage) string {
+	if nodeImage.Spec.Provider == "capmox" {
+		return getQcow2ImageKey(nodeImage)
+	}
+	return getOVAImageKey(nodeImage)
+}
+
+func getOVAImageKey(nodeImage *images.NodeImage) string {
 	// the image name is like "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
 	// the ova file name is like "flatcar-stable-3975.2.0-kube-v1.30.4.ova"
 	ovaFileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
@@ -129,12 +136,24 @@ func GetImageKey(nodeImage *images.NodeImage) string {
 	return fmt.Sprintf("%s/%s/%s.ova", s3Provider, nodeImage.Spec.Name, ovaFileName)
 }
 
+func getQcow2ImageKey(nodeImage *images.NodeImage) string {
+	// the image name is like "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
+	// the qcow2 file name is like "flatcar-stable-3975.2.0-kube-v1.30.4.qcow2"
+	qcow2FileName := strings.Split(nodeImage.Spec.Name, "-tooling")[0]
+	regexp := regexp.MustCompile(`(kube-)(\d+\.\d+\.\d+)`)
+	qcow2FileName = regexp.ReplaceAllString(qcow2FileName, `${1}v${2}`)
+
+	return fmt.Sprintf("capmox/%s/%s.qcow2", nodeImage.Spec.Name, qcow2FileName)
+}
+
 func getProviderFromProviderName(providerName string) string {
 	switch providerName {
 	case "vsphere":
 		return "capv"
 	case "cloud-director":
 		return "capvcd"
+	case "proxmox":
+		return "capmox"
 	default:
 		return providerName
 	}

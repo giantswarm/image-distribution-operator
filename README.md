@@ -81,15 +81,68 @@ vcd:
     catalog: "my-catalog"
 ```
 
+### Proxmox Client
+The `image-controller` can create VM templates in one or more Proxmox VE nodes.
+It uses the Proxmox REST API exclusively (no SSH access required) to download qcow2 images
+from S3, create a VM, import the disk, convert it to a template, and tag it with component versions.
+
+The Proxmox API token must have the following permissions: `VM.*`, `Datastore.*`, `SDN.*`, `Sys.AccessNetwork`, `Sys.Audit` on `/`.
+
+The `local` storage (or whichever storage is used as `importStorage`) must have the `import` content type enabled.
+This can be done via the API (non-destructive, preserves existing content types):
+
+```
+PUT /api2/json/storage/local
+  content=backup,iso,vztmpl,import
+```
+
+The credentials and locations are specified inside the `values.yaml` file.
+
+```yaml
+proxmox:
+  credentials:
+    url: "proxmox.example.com:8006"
+    user: "my-user"
+    realm: "pve"       # defaults to "pam" if omitted
+    tokenId: "my-token"
+    secret: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    insecure: false     # set to true for self-signed certificates
+  locations:
+    location1:
+      node: "pve-node-1"
+      storagePool: "local-lvm"     # target storage for the VM disk
+      importStorage: "local"       # storage for downloaded images (defaults to "local")
+      bridge: "vmbr0"
+    location2:
+      node: "pve-node-2"
+      storagePool: "ceph-pool"
+      bridge: "vmbr1"
+```
+
+The template creation procedure follows these steps:
+1. Download the qcow2 from S3 to Proxmox import storage
+2. Allocate a VMID and create an empty VM
+3. Import the disk into the VM
+4. Set boot order and convert to template
+5. Tag the template with component versions (e.g. `flatcar_4459.2.4;kubernetes_1.34.5;os-tooling_v1.27.0;release-channel_stable`)
+6. Clean up the import file
+
+If any step fails, the operator performs best-effort cleanup of partial resources (VM, import file).
+
 ## Getting Started
 
 ### Network requirements
 
-#### Pull mode
+#### Proxmox
+
+The Proxmox node must have outbound HTTPS access to the S3 bucket to download images.
+The IDO pod must have access to the Proxmox API on port 8006.
+
+#### Pull mode (vSphere)
 
 The vSphere ESXi hosts must have access to the internet on port 443 (or 80, not preferred), this includes the vSphere firewall outgoing rules under `Hostname > Configure > System > Firewall > Outgoing > Edit > httpClient`.
 
-#### Push mode
+#### Push mode (vSphere)
 
 The IDO pod must have access to the IP of the vSphere ESXi hosts on port 443.
 
