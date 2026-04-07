@@ -124,7 +124,7 @@ The template creation procedure follows these steps:
 2. Allocate a VMID and create an empty VM
 3. Import the disk into the VM
 4. Set boot order and convert to template
-5. Tag the template with component versions (e.g. `flatcar_4459.2.4;kubernetes_1.34.5;os-tooling_v1.27.0;release-channel_stable`)
+5. Tag the template with component versions (e.g. `flatcar_4459.2.4;kubernetes_1.34.5;os-tooling_1.27.0;release-channel_stable`)
 6. Clean up the import file
 
 If any step fails, the operator performs best-effort cleanup of partial resources (VM, import file).

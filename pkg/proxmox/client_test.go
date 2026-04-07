@@ -25,12 +25,12 @@ func TestBuildTags(t *testing.T) {
 		{
 			name:         "case 0: standard image name",
 			imageName:    "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-			expectedTags: "flatcar_3975.2.0;kubernetes_1.30.4;os-tooling_v1.18.1;release-channel_stable",
+			expectedTags: "flatcar_3975.2.0;kubernetes_1.30.4;os-tooling_1.18.1;release-channel_stable",
 		},
 		{
 			name:         "case 1: beta channel",
 			imageName:    "flatcar-beta-4459.2.4-kube-1.34.5-tooling-1.27.0-gs",
-			expectedTags: "flatcar_4459.2.4;kubernetes_1.34.5;os-tooling_v1.27.0;release-channel_beta",
+			expectedTags: "flatcar_4459.2.4;kubernetes_1.34.5;os-tooling_1.27.0;release-channel_beta",
 		},
 		{
 			name:         "case 2: invalid image name returns empty",

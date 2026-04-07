@@ -234,7 +234,7 @@ func (c *Client) cleanupImportFile(ctx context.Context, node string, filename st
 
 // buildTags constructs Proxmox-compatible tags from an image name.
 // Input:  "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
-// Output: "flatcar_3975.2.0;kubernetes_1.30.4;os-tooling_v1.18.1;release-channel_stable"
+// Output: "flatcar_3975.2.0;kubernetes_1.30.4;os-tooling_1.18.1;release-channel_stable"
 func buildTags(imageName string) string {
 	re := regexp.MustCompile(
 		`^flatcar-([a-z]+)-([0-9.]+)-kube-([0-9.]+)-tooling-([0-9.]+)-gs$`,
@@ -252,7 +252,7 @@ func buildTags(imageName string) string {
 	tags := []string{
 		fmt.Sprintf("flatcar_%s", flatcarVersion),
 		fmt.Sprintf("kubernetes_%s", kubeVersion),
-		fmt.Sprintf("os-tooling_v%s", toolingVersion),
+		fmt.Sprintf("os-tooling_%s", toolingVersion),
 		fmt.Sprintf("release-channel_%s", channel),
 	}
 
