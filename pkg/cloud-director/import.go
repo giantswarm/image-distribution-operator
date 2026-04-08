@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
 	"github.com/vmware/go-vcloud-director/v3/types/v56"
@@ -76,6 +77,8 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 }
 
 // setHardwareVersion updates the VM hardware version on the uploaded vApp template
+// by PUTting a modified virtualHardwareSection directly on the template child VM.
+// This avoids using /action/reconfigureVm which is not available on template VMs.
 func (c *Client) setHardwareVersion(ctx context.Context, config ImporterConfig) error {
 	log := log.FromContext(ctx)
 
@@ -89,17 +92,59 @@ func (c *Client) setHardwareVersion(ctx context.Context, config ImporterConfig) 
 	}
 
 	vmHref := vAppTemplate.VAppTemplate.Children.VM[0].HREF
-	vm, err := c.cloudDirector.Client.GetVMByHref(vmHref)
+	hwSectionURL := vmHref + "/virtualHardwareSection/"
+
+	// GET the current virtualHardwareSection
+	current := &types.ResponseVirtualHardwareSection{}
+	_, err = c.cloudDirector.Client.ExecuteRequest(
+		hwSectionURL, http.MethodGet,
+		types.MimeVirtualHardwareSection,
+		"failed to get virtualHardwareSection: %s",
+		nil, current,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to get VM from template: %w", err)
+		return fmt.Errorf("failed to get virtualHardwareSection: %w", err)
 	}
 
-	vmSpecSection := vm.VM.VmSpecSection
-	vmSpecSection.HardwareVersion = &types.HardwareVersion{Value: "vmx-19"}
+	// Patch the System element to set vmx-19
+	hwVersionRe := regexp.MustCompile(`<vssd:VirtualSystemType>[^<]+</vssd:VirtualSystemType>`)
+	patchedSystem := make([]types.InnerXML, len(current.System))
+	for i, s := range current.System {
+		patchedSystem[i] = types.InnerXML{
+			Text: hwVersionRe.ReplaceAllString(s.Text, "<vssd:VirtualSystemType>vmx-19</vssd:VirtualSystemType>"),
+		}
+	}
 
-	_, err = vm.UpdateVmSpecSection(vmSpecSection, "Update hardware version to vmx-19")
+	// PUT the updated section back
+	payload := &types.RequestVirtualHardwareSection{
+		Info:   "Virtual hardware requirements",
+		Ovf:    types.XMLNamespaceOVF,
+		Rasd:   types.XMLNamespaceRASD,
+		Vssd:   types.XMLNamespaceVSSD,
+		Ns2:    types.XMLNamespaceVCloud,
+		Ns3:    types.XMLNamespaceVCloud,
+		Ns4:    types.XMLNamespaceVCloud,
+		Ns5:    types.XMLNamespaceVCloud,
+		Vmw:    types.XMLNamespaceVMW,
+		Xmlns:  types.XMLNamespaceVCloud,
+		Type:   current.Type,
+		HREF:   hwSectionURL,
+		System: patchedSystem,
+		Item:   current.Item,
+	}
+
+	task, err := c.cloudDirector.Client.ExecuteTaskRequest(
+		hwSectionURL, http.MethodPut,
+		types.MimeVirtualHardwareSection,
+		"failed to set virtualHardwareSection: %s",
+		payload,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to update VM spec section: %w", err)
+		return fmt.Errorf("failed to update virtualHardwareSection: %w", err)
+	}
+
+	if err = task.WaitTaskCompletion(); err != nil {
+		return fmt.Errorf("virtualHardwareSection update task failed: %w", err)
 	}
 
 	log.Info("Hardware version set to vmx-19", "name", config.Name)
