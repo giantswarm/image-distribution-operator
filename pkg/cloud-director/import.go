@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
-	"github.com/vmware/go-vcloud-director/v3/types/v56" // nolint:importas
+	"github.com/vmware/go-vcloud-director/v3/types/v56"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
