@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
+	"github.com/vmware/go-vcloud-director/v3/types/v56" // nolint:importas
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -65,6 +66,43 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	}
 
 	log.Info("Push upload completed successfully", "name", config.Name)
+
+	// Set VM hardware version to vmx-19
+	if err := c.setHardwareVersion(ctx, config); err != nil {
+		return fmt.Errorf("failed to set hardware version: %w", err)
+	}
+
+	return nil
+}
+
+// setHardwareVersion updates the VM hardware version on the uploaded vApp template
+func (c *Client) setHardwareVersion(ctx context.Context, config ImporterConfig) error {
+	log := log.FromContext(ctx)
+
+	vAppTemplate, err := config.Catalog.GetVAppTemplateByName(config.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get vApp template %s: %w", config.Name, err)
+	}
+
+	if vAppTemplate.VAppTemplate.Children == nil || len(vAppTemplate.VAppTemplate.Children.VM) == 0 {
+		return fmt.Errorf("vApp template %s has no child VMs", config.Name)
+	}
+
+	vmHref := vAppTemplate.VAppTemplate.Children.VM[0].HREF
+	vm, err := c.cloudDirector.Client.GetVMByHref(vmHref)
+	if err != nil {
+		return fmt.Errorf("failed to get VM from template: %w", err)
+	}
+
+	vmSpecSection := vm.VM.VmSpecSection
+	vmSpecSection.HardwareVersion = &types.HardwareVersion{Value: "vmx-19"}
+
+	_, err = vm.UpdateVmSpecSection(vmSpecSection, "Update hardware version to vmx-19")
+	if err != nil {
+		return fmt.Errorf("failed to update VM spec section: %w", err)
+	}
+
+	log.Info("Hardware version set to vmx-19", "name", config.Name)
 	return nil
 }
 
