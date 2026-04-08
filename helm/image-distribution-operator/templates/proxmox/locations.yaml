@@ -1,0 +1,12 @@
+{{- if .Values.proxmox.locations }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  name: image-distribution-operator-proxmox-locations
+  namespace: {{ .Release.Namespace }}
+data:
+  locations: |-
+    {{- .Values.proxmox.locations | toYaml | nindent 4 }}
+{{- end }}
