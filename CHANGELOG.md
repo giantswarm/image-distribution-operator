@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] - 2026-04-08
 
+### Added
+
 - Add Proxmox provider support for image distribution.
 
 ## [0.8.0] - 2026-02-25
