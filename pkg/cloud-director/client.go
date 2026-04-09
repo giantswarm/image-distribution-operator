@@ -33,7 +33,7 @@ type Location struct {
 	Org             string `yaml:"org"`
 	VDC             string `yaml:"vdc"`
 	Catalog         string `yaml:"catalog"`
-	HardwareVersion int `yaml:"hardwareVersion"`
+	HardwareVersion int    `yaml:"hardwareVersion"`
 }
 
 // Config holds the configuration for the cloudDirector client
