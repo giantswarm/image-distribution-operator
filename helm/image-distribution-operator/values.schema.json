@@ -264,6 +264,37 @@
                 }
             }
         },
+        "proxmox": {
+            "type": "object",
+            "properties": {
+                "credentials": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string"
+                        },
+                        "user": {
+                            "type": "string"
+                        },
+                        "realm": {
+                            "type": "string"
+                        },
+                        "tokenId": {
+                            "type": "string"
+                        },
+                        "secret": {
+                            "type": "string"
+                        },
+                        "insecure": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "locations": {
+                    "type": "object"
+                }
+            }
+        },
         "vsphere": {
             "type": "object",
             "properties": {

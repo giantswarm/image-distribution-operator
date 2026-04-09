@@ -102,6 +102,16 @@ vcd:
     catalog: ""
     hardwareVersion: 19
 
+proxmox:
+  credentials:
+    url: ""
+    user: ""
+    realm: "pam"
+    tokenId: ""
+    secret: ""
+    insecure: false
+  locations: {}
+
 s3:
   bucket: ""
   region: ""

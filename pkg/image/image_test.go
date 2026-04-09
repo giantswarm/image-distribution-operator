@@ -43,12 +43,18 @@ func TestGetImageProvider(t *testing.T) {
 			expectError:      false,
 		},
 		{
-			name:        "case 4: invalid release name without version",
+			name:             "case 4: proxmox release extracts proxmox provider",
+			releaseName:      "proxmox-1.2.3",
+			expectedProvider: "proxmox",
+			expectError:      false,
+		},
+		{
+			name:        "case 5: invalid release name without version",
 			releaseName: "vsphere",
 			expectError: true,
 		},
 		{
-			name:        "case 5: invalid release name with invalid format",
+			name:        "case 6: invalid release name with invalid format",
 			releaseName: "invalid-release-name",
 			expectError: true,
 		},
@@ -85,12 +91,17 @@ func TestGetProviderFromProviderName(t *testing.T) {
 			expectedProvider: "capvcd",
 		},
 		{
-			name:             "case 2: unknown provider returns same name",
+			name:             "case 2: proxmox maps to capmox",
+			providerName:     "proxmox",
+			expectedProvider: "capmox",
+		},
+		{
+			name:             "case 3: unknown provider returns same name",
 			providerName:     "aws",
 			expectedProvider: "aws",
 		},
 		{
-			name:             "case 3: test provider returns same name",
+			name:             "case 4: test provider returns same name",
 			providerName:     "test",
 			expectedProvider: "test",
 		},
@@ -155,7 +166,27 @@ func TestGetNodeImageFromRelease(t *testing.T) {
 			expectError:        false,
 		},
 		{
-			name: "case 2: missing flatcar component returns error",
+			name: "case 2: proxmox release creates correct node image",
+			release: &releases.Release{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "proxmox-1.2.3",
+				},
+				Spec: releases.ReleaseSpec{
+					Components: []releases.ReleaseSpecComponent{
+						{Name: "flatcar", Version: "3975.2.0"},
+						{Name: "kubernetes", Version: "v1.30.4"},
+						{Name: "os-tooling", Version: "v1.18.1"},
+					},
+				},
+			},
+			flatcarChannel:     "stable",
+			expectedImageName:  "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
+			expectedProvider:   "capmox",
+			expectedObjectName: "capmox-flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
+			expectError:        false,
+		},
+		{
+			name: "case 3: missing flatcar component returns error",
 			release: &releases.Release{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "vsphere-1.2.3",
@@ -171,7 +202,7 @@ func TestGetNodeImageFromRelease(t *testing.T) {
 			expectError:    true,
 		},
 		{
-			name: "case 3: missing kubernetes component returns error",
+			name: "case 4: missing kubernetes component returns error",
 			release: &releases.Release{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cloud-director-0.10.5",
@@ -233,7 +264,18 @@ func TestGetImageKey(t *testing.T) {
 				"flatcar-stable-3975.2.0-kube-v1.30.4.ova",
 		},
 		{
-			name: "case 2: image with different kubernetes version",
+			name: "case 2: proxmox/capmox node image generates correct qcow2 S3 key",
+			nodeImage: &images.NodeImage{
+				Spec: images.NodeImageSpec{
+					Name:     "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
+					Provider: "capmox",
+				},
+			},
+			expectedImageKey: "capmox/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
+				"flatcar-stable-3975.2.0-kube-v1.30.4.qcow2",
+		},
+		{
+			name: "case 3: image with different kubernetes version",
 			nodeImage: &images.NodeImage{
 				Spec: images.NodeImageSpec{
 					Name:     "flatcar-stable-3975.2.0-kube-1.29.0-tooling-1.18.1-gs",
