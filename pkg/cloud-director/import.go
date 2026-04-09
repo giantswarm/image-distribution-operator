@@ -1,15 +1,16 @@
 package clouddirector
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
-	"github.com/vmware/go-vcloud-director/v3/types/v56"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -40,6 +41,20 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 		}
 	}() // Cleanup after upload
 
+	// Patch the OVF descriptor in the OVA to set vmx-19
+	patchedPath, err := patchOVAHardwareVersion(localPath, c.downloadDir)
+	if err != nil {
+		return fmt.Errorf("failed to patch OVA hardware version: %w", err)
+	}
+	if patchedPath != localPath {
+		defer func() {
+			if removeErr := os.Remove(patchedPath); removeErr != nil {
+				log.Info("Failed to cleanup patched OVA", "path", patchedPath, "error", removeErr)
+			}
+		}()
+		localPath = patchedPath
+	}
+
 	log.Info("Starting upload to cloud director", "localPath", localPath)
 
 	// Upload to cloud director
@@ -68,87 +83,82 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 
 	log.Info("Push upload completed successfully", "name", config.Name)
 
-	// Set VM hardware version to vmx-19
-	if err := c.setHardwareVersion(ctx, config); err != nil {
-		return fmt.Errorf("failed to set hardware version: %w", err)
-	}
-
 	return nil
 }
 
-// setHardwareVersion updates the VM hardware version on the uploaded vApp template
-// by PUTting a modified virtualHardwareSection directly on the template child VM.
-// This avoids using /action/reconfigureVm which is not available on template VMs.
-func (c *Client) setHardwareVersion(ctx context.Context, config ImporterConfig) error {
-	log := log.FromContext(ctx)
+// hwVersionRe matches the VirtualSystemType element in an OVF descriptor
+var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
 
-	vAppTemplate, err := config.Catalog.GetVAppTemplateByName(config.Name)
+// patchOVAHardwareVersion rewrites the OVF descriptor inside the OVA tarball,
+// replacing the VirtualSystemType with vmx-19. Returns the path to the patched
+// OVA (a new temp file) or the original path unchanged if no OVF was found.
+func patchOVAHardwareVersion(ovaPath, dir string) (string, error) {
+	in, err := os.Open(ovaPath) // #nosec G304
 	if err != nil {
-		return fmt.Errorf("failed to get vApp template %s: %w", config.Name, err)
+		return "", fmt.Errorf("open OVA: %w", err)
 	}
+	defer func() { _ = in.Close() }()
 
-	if vAppTemplate.VAppTemplate.Children == nil || len(vAppTemplate.VAppTemplate.Children.VM) == 0 {
-		return fmt.Errorf("vApp template %s has no child VMs", config.Name)
-	}
-
-	vmHref := vAppTemplate.VAppTemplate.Children.VM[0].HREF
-	hwSectionURL := vmHref + "/virtualHardwareSection/"
-
-	// GET the current virtualHardwareSection
-	current := &types.ResponseVirtualHardwareSection{}
-	_, err = c.cloudDirector.Client.ExecuteRequest(
-		hwSectionURL, http.MethodGet,
-		types.MimeVirtualHardwareSection,
-		"failed to get virtualHardwareSection: %s",
-		nil, current,
-	)
+	out, err := os.CreateTemp(dir, "vcd-patched-*.ova")
 	if err != nil {
-		return fmt.Errorf("failed to get virtualHardwareSection: %w", err)
+		return "", fmt.Errorf("create temp file: %w", err)
 	}
+	outPath := out.Name()
 
-	// Patch the System element to set vmx-19
-	hwVersionRe := regexp.MustCompile(`<vssd:VirtualSystemType>[^<]+</vssd:VirtualSystemType>`)
-	patchedSystem := make([]types.InnerXML, len(current.System))
-	for i, s := range current.System {
-		patchedSystem[i] = types.InnerXML{
-			Text: hwVersionRe.ReplaceAllString(s.Text, "<vssd:VirtualSystemType>vmx-19</vssd:VirtualSystemType>"),
+	patched, err := rewriteOVA(in, out)
+	_ = out.Close()
+	if err != nil {
+		_ = os.Remove(outPath)
+		return "", err
+	}
+	if !patched {
+		_ = os.Remove(outPath)
+		return ovaPath, nil // nothing to patch, use original
+	}
+	return outPath, nil
+}
+
+// rewriteOVA copies the tar from r to w, patching any .ovf entry it finds.
+// Returns true if an OVF entry was found and patched.
+func rewriteOVA(r io.Reader, w io.Writer) (bool, error) {
+	tr := tar.NewReader(r)
+	tw := tar.NewWriter(w)
+	defer func() { _ = tw.Close() }()
+
+	patched := false
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return false, fmt.Errorf("read OVA tar: %w", err)
+		}
+
+		if strings.HasSuffix(strings.ToLower(hdr.Name), ".ovf") {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return false, fmt.Errorf("read OVF entry: %w", err)
+			}
+			patchedData := hwVersionRe.ReplaceAll(data, []byte("<vssd:VirtualSystemType>vmx-19</vssd:VirtualSystemType>"))
+			hdr.Size = int64(len(patchedData))
+			if err := tw.WriteHeader(hdr); err != nil {
+				return false, fmt.Errorf("write OVF header: %w", err)
+			}
+			if _, err := tw.Write(patchedData); err != nil {
+				return false, fmt.Errorf("write OVF data: %w", err)
+			}
+			patched = true
+		} else {
+			if err := tw.WriteHeader(hdr); err != nil {
+				return false, fmt.Errorf("write tar header: %w", err)
+			}
+			if _, err := io.Copy(tw, tr); err != nil {
+				return false, fmt.Errorf("copy tar entry: %w", err)
+			}
 		}
 	}
-
-	// PUT the updated section back
-	payload := &types.RequestVirtualHardwareSection{
-		Info:   "Virtual hardware requirements",
-		Ovf:    types.XMLNamespaceOVF,
-		Rasd:   types.XMLNamespaceRASD,
-		Vssd:   types.XMLNamespaceVSSD,
-		Ns2:    types.XMLNamespaceVCloud,
-		Ns3:    types.XMLNamespaceVCloud,
-		Ns4:    types.XMLNamespaceVCloud,
-		Ns5:    types.XMLNamespaceVCloud,
-		Vmw:    types.XMLNamespaceVMW,
-		Xmlns:  types.XMLNamespaceVCloud,
-		Type:   current.Type,
-		HREF:   hwSectionURL,
-		System: patchedSystem,
-		Item:   current.Item,
-	}
-
-	task, err := c.cloudDirector.Client.ExecuteTaskRequest(
-		hwSectionURL, http.MethodPut,
-		types.MimeVirtualHardwareSection,
-		"failed to set virtualHardwareSection: %s",
-		payload,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update virtualHardwareSection: %w", err)
-	}
-
-	if err = task.WaitTaskCompletion(); err != nil {
-		return fmt.Errorf("virtualHardwareSection update task failed: %w", err)
-	}
-
-	log.Info("Hardware version set to vmx-19", "name", config.Name)
-	return nil
+	return patched, nil
 }
 
 // downloadImage downloads OVA from S3 to local temp file
