@@ -16,9 +16,10 @@ import (
 
 // ImporterConfig holds the configuration for the OVF importer
 type ImporterConfig struct {
-	Name    string
-	Path    string
-	Catalog *govcd.Catalog
+	Name            string
+	Path            string
+	Catalog         *govcd.Catalog
+	HardwareVersion int // e.g. 19 → "vmx-19"; 0 means no patching
 }
 
 // importImage handles the actual import using push mode and waits for completion
@@ -41,18 +42,20 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 		}
 	}() // Cleanup after upload
 
-	// Patch the OVF descriptor in the OVA to set vmx-19
-	patchedPath, err := patchOVAHardwareVersion(localPath, c.downloadDir)
-	if err != nil {
-		return fmt.Errorf("failed to patch OVA hardware version: %w", err)
-	}
-	if patchedPath != localPath {
-		defer func() {
-			if removeErr := os.Remove(patchedPath); removeErr != nil {
-				log.Info("Failed to cleanup patched OVA", "path", patchedPath, "error", removeErr)
-			}
-		}()
-		localPath = patchedPath
+	// Patch the OVF descriptor in the OVA if a hardware version is configured
+	if config.HardwareVersion != 0 {
+		patchedPath, err := patchOVAHardwareVersion(localPath, c.downloadDir, fmt.Sprintf("vmx-%d", config.HardwareVersion))
+		if err != nil {
+			return fmt.Errorf("failed to patch OVA hardware version: %w", err)
+		}
+		if patchedPath != localPath {
+			defer func() {
+				if removeErr := os.Remove(patchedPath); removeErr != nil {
+					log.Info("Failed to cleanup patched OVA", "path", patchedPath, "error", removeErr)
+				}
+			}()
+			localPath = patchedPath
+		}
 	}
 
 	log.Info("Starting upload to cloud director", "localPath", localPath)
@@ -90,9 +93,10 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
 
 // patchOVAHardwareVersion rewrites the OVF descriptor inside the OVA tarball,
-// replacing the VirtualSystemType with vmx-19. Returns the path to the patched
-// OVA (a new temp file) or the original path unchanged if no OVF was found.
-func patchOVAHardwareVersion(ovaPath, dir string) (string, error) {
+// replacing the VirtualSystemType with the given hardware version. Returns the
+// path to the patched OVA (a new temp file) or the original path unchanged if
+// no OVF was found.
+func patchOVAHardwareVersion(ovaPath, dir, hardwareVersion string) (string, error) {
 	in, err := os.Open(ovaPath) // #nosec G304
 	if err != nil {
 		return "", fmt.Errorf("open OVA: %w", err)
@@ -105,7 +109,7 @@ func patchOVAHardwareVersion(ovaPath, dir string) (string, error) {
 	}
 	outPath := out.Name()
 
-	patched, err := rewriteOVA(in, out)
+	patched, err := rewriteOVA(in, out, hardwareVersion)
 	_ = out.Close()
 	if err != nil {
 		_ = os.Remove(outPath)
@@ -120,11 +124,12 @@ func patchOVAHardwareVersion(ovaPath, dir string) (string, error) {
 
 // rewriteOVA copies the tar from r to w, patching any .ovf entry it finds.
 // Returns true if an OVF entry was found and patched.
-func rewriteOVA(r io.Reader, w io.Writer) (bool, error) {
+func rewriteOVA(r io.Reader, w io.Writer, hardwareVersion string) (bool, error) {
 	tr := tar.NewReader(r)
 	tw := tar.NewWriter(w)
 	defer func() { _ = tw.Close() }()
 
+	replacement := []byte("<vssd:VirtualSystemType>" + hardwareVersion + "</vssd:VirtualSystemType>")
 	patched := false
 	for {
 		hdr, err := tr.Next()
@@ -140,7 +145,7 @@ func rewriteOVA(r io.Reader, w io.Writer) (bool, error) {
 			if err != nil {
 				return false, fmt.Errorf("read OVF entry: %w", err)
 			}
-			patchedData := hwVersionRe.ReplaceAll(data, []byte("<vssd:VirtualSystemType>vmx-19</vssd:VirtualSystemType>"))
+			patchedData := hwVersionRe.ReplaceAll(data, replacement)
 			hdr.Size = int64(len(patchedData))
 			if err := tw.WriteHeader(hdr); err != nil {
 				return false, fmt.Errorf("write OVF header: %w", err)
