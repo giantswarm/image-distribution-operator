@@ -29,10 +29,11 @@ type Credentials struct {
 
 // Location holds a single location configuration
 type Location struct {
-	Name    string `yaml:"name"`
-	Org     string `yaml:"org"`
-	VDC     string `yaml:"vdc"`
-	Catalog string `yaml:"catalog"`
+	Name            string `yaml:"name"`
+	Org             string `yaml:"org"`
+	VDC             string `yaml:"vdc"`
+	Catalog         string `yaml:"catalog"`
+	HardwareVersion int    `yaml:"hardwareVersion"`
 }
 
 // Config holds the configuration for the cloudDirector client
@@ -157,9 +158,10 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 
 	// Create import configuration
 	importConfig := ImporterConfig{
-		Name:    imageName,
-		Path:    imageURL,
-		Catalog: catalog,
+		Name:            imageName,
+		Path:            imageURL,
+		Catalog:         catalog,
+		HardwareVersion: c.location.HardwareVersion,
 	}
 
 	log.Info("Starting image import", "name", imageName, "url", imageURL)

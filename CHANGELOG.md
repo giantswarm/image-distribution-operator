@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Make virtual hardware version configurable in VCD.
+
 ## [0.9.0] - 2026-04-08
 
 ### Added

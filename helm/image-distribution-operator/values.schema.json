@@ -250,6 +250,10 @@
                         "catalog": {
                             "type": "string"
                         },
+                        "hardwareVersion": {
+                            "type": "integer",
+                            "default": 19
+                        },
                         "name": {
                             "type": "string"
                         },
