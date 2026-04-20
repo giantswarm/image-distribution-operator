@@ -79,7 +79,8 @@ func (c *Client) importImage(ctx context.Context, imageURL string, imageName str
 	}
 
 	options := &importer.Options{
-		Name: &imageName,
+		Name:             &imageName,
+		DiskProvisioning: "thin",
 		NetworkMapping: []importer.Network{
 			{
 				Name:    "nic0",

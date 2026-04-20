@@ -1,11 +1,14 @@
 package clouddirector
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -13,9 +16,10 @@ import (
 
 // ImporterConfig holds the configuration for the OVF importer
 type ImporterConfig struct {
-	Name    string
-	Path    string
-	Catalog *govcd.Catalog
+	Name            string
+	Path            string
+	Catalog         *govcd.Catalog
+	HardwareVersion int // e.g. 19 → "vmx-19"; 0 means no patching
 }
 
 // importImage handles the actual import using push mode and waits for completion
@@ -37,6 +41,22 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 			log.Info("Failed to cleanup temp file", "path", localPath, "error", removeErr)
 		}
 	}() // Cleanup after upload
+
+	// Patch the OVF descriptor in the OVA if a hardware version is configured
+	if config.HardwareVersion != 0 {
+		patchedPath, err := patchOVAHardwareVersion(localPath, c.downloadDir, fmt.Sprintf("vmx-%d", config.HardwareVersion))
+		if err != nil {
+			return fmt.Errorf("failed to patch OVA hardware version: %w", err)
+		}
+		if patchedPath != localPath {
+			defer func() {
+				if removeErr := os.Remove(patchedPath); removeErr != nil {
+					log.Info("Failed to cleanup patched OVA", "path", patchedPath, "error", removeErr)
+				}
+			}()
+			localPath = patchedPath
+		}
+	}
 
 	log.Info("Starting upload to cloud director", "localPath", localPath)
 
@@ -65,7 +85,85 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	}
 
 	log.Info("Push upload completed successfully", "name", config.Name)
+
 	return nil
+}
+
+// hwVersionRe matches the VirtualSystemType element in an OVF descriptor
+var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
+
+// patchOVAHardwareVersion rewrites the OVF descriptor inside the OVA tarball,
+// replacing the VirtualSystemType with the given hardware version. Returns the
+// path to the patched OVA (a new temp file) or the original path unchanged if
+// no OVF was found.
+func patchOVAHardwareVersion(ovaPath, dir, hardwareVersion string) (string, error) {
+	in, err := os.Open(ovaPath) // #nosec G304
+	if err != nil {
+		return "", fmt.Errorf("open OVA: %w", err)
+	}
+	defer func() { _ = in.Close() }()
+
+	out, err := os.CreateTemp(dir, "vcd-patched-*.ova")
+	if err != nil {
+		return "", fmt.Errorf("create temp file: %w", err)
+	}
+	outPath := out.Name()
+
+	patched, err := rewriteOVA(in, out, hardwareVersion)
+	_ = out.Close()
+	if err != nil {
+		_ = os.Remove(outPath)
+		return "", err
+	}
+	if !patched {
+		_ = os.Remove(outPath)
+		return ovaPath, nil // nothing to patch, use original
+	}
+	return outPath, nil
+}
+
+// rewriteOVA copies the tar from r to w, patching any .ovf entry it finds.
+// Returns true if an OVF entry was found and patched.
+func rewriteOVA(r io.Reader, w io.Writer, hardwareVersion string) (bool, error) {
+	tr := tar.NewReader(r)
+	tw := tar.NewWriter(w)
+	defer func() { _ = tw.Close() }()
+
+	replacement := []byte("<vssd:VirtualSystemType>" + hardwareVersion + "</vssd:VirtualSystemType>")
+	patched := false
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return false, fmt.Errorf("read OVA tar: %w", err)
+		}
+
+		if strings.HasSuffix(strings.ToLower(hdr.Name), ".ovf") {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				return false, fmt.Errorf("read OVF entry: %w", err)
+			}
+			patchedData := hwVersionRe.ReplaceAll(data, replacement)
+			hdr.Size = int64(len(patchedData))
+			if err := tw.WriteHeader(hdr); err != nil {
+				return false, fmt.Errorf("write OVF header: %w", err)
+			}
+			if _, err := tw.Write(patchedData); err != nil {
+				return false, fmt.Errorf("write OVF data: %w", err)
+			}
+			patched = true
+		} else {
+			if err := tw.WriteHeader(hdr); err != nil {
+				return false, fmt.Errorf("write tar header: %w", err)
+			}
+			if _, err := io.Copy(tw, tr); err != nil {
+				return false, fmt.Errorf("copy tar entry: %w", err)
+			}
+		}
+	}
+	return patched, nil
 }
 
 // downloadImage downloads OVA from S3 to local temp file

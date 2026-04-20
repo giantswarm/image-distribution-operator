@@ -3,12 +3,17 @@ package image
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	images "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+)
+
+const (
+	LastUsedAnnotation = "image-distribution-operator.giantswarm.io/last-used"
 )
 
 // Config is a struct that holds the configuration for the Client
@@ -71,10 +76,10 @@ func (i *Client) RemoveReleaseFromNodeImageStatus(ctx context.Context, image str
 	}
 	// Update the object
 	log.Info("Removing release from the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Status().Update(ctx, object)
+	return i.Status().Update(ctx, object)
 }
 
-func (i *Client) DeleteImage(ctx context.Context, image string) error {
+func (i *Client) DeleteImage(ctx context.Context, image string, retentionPeriod time.Duration) error {
 	log := log.FromContext(ctx)
 
 	// Get Image Object
@@ -91,6 +96,25 @@ func (i *Client) DeleteImage(ctx context.Context, image string) error {
 
 	// If there are still releases in the list, nothing to do
 	if len(object.Status.Releases) > 0 {
+		return nil
+	}
+
+	// Check if we should retain the image
+	if retentionPeriod > 0 {
+		// update state to AwaitingDeletion if not already
+		if object.Status.State != images.NodeImageAwaitingDeletion {
+			object.Status.State = images.NodeImageAwaitingDeletion
+			// Set last used annotation
+			if object.Annotations == nil {
+				object.Annotations = make(map[string]string)
+			}
+			object.Annotations[LastUsedAnnotation] = time.Now().Format(time.RFC3339)
+			log.Info("Marking node image for deletion", "nodeImage", object.Name, "retentionPeriod", retentionPeriod)
+			if err := i.Update(ctx, object); err != nil {
+				return err
+			}
+			return i.Status().Update(ctx, object)
+		}
 		return nil
 	}
 
@@ -134,11 +158,21 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	// Add release to the list
 	object.Status.Releases = append(object.Status.Releases, i.Release)
 
-	// If the State is empty, set it to Pending
-	if object.Status.State == "" {
+	// If the State is empty or AwaitingDeletion, set it to Pending and remove last used annotation
+	if object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion {
 		object.Status.State = images.NodeImagePending
+		// Remove last used annotation if it exists
+		if object.Annotations != nil {
+			if _, exists := object.Annotations[LastUsedAnnotation]; exists {
+				delete(object.Annotations, LastUsedAnnotation)
+				// Update metadata first to clear annotation
+				if err := i.Update(ctx, object); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
-	return i.Client.Status().Update(ctx, object)
+	return i.Status().Update(ctx, object)
 }

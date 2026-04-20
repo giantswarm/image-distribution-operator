@@ -45,6 +45,7 @@ import (
 	"github.com/giantswarm/image-distribution-operator/internal/controller/release"
 	clouddirector "github.com/giantswarm/image-distribution-operator/pkg/cloud-director"
 	"github.com/giantswarm/image-distribution-operator/pkg/provider"
+	"github.com/giantswarm/image-distribution-operator/pkg/proxmox"
 	"github.com/giantswarm/image-distribution-operator/pkg/s3"
 	"github.com/giantswarm/image-distribution-operator/pkg/vsphere"
 	// +kubebuilder:scaffold:imports
@@ -87,6 +88,11 @@ func main() {
 	var vcdLocations string
 	var vcdDownloadDir string
 
+	var proxmoxCredentials string
+	var proxmoxLocations string
+
+	var imageRetentionPeriod time.Duration
+
 	flag.StringVar(&namespace, "namespace", "giantswarm", "The namespace where node image objects are managed.")
 	flag.StringVar(&s3Bucket, "s3-bucket", "", "The S3 bucket where images are stored.")
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
@@ -105,6 +111,14 @@ func main() {
 		"The file containing the locations for VMware Cloud Director resources.")
 	flag.StringVar(&vcdDownloadDir, "vcd-download-dir", "/tmp/images",
 		"The directory where VCD images are downloaded.")
+
+	flag.StringVar(&proxmoxCredentials, "proxmox-credentials", "/home/.proxmox/credentials",
+		"The file containing the credentials for Proxmox resources.")
+	flag.StringVar(&proxmoxLocations, "proxmox-locations", "/home/.proxmox/locations",
+		"The file containing the locations for Proxmox resources.")
+
+	flag.DurationVar(&imageRetentionPeriod, "image-retention-period", 0,
+		"The duration for which unused images are retained before deletion.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -287,6 +301,21 @@ func main() {
 		setupLog.Info("Cloud Director provider initialized successfully", "provider", "capvcd")
 	}
 
+	// Try to initialize Proxmox provider
+	proxmoxClient, err := proxmox.New(proxmox.Config{
+		CredentialsFile: proxmoxCredentials,
+		LocationsFile:   proxmoxLocations,
+	}, context.Background())
+	if err != nil {
+		setupLog.Info(
+			"Proxmox provider not configured - will fail if NodeImage references 'capmox' provider",
+			"error", err,
+		)
+	} else {
+		providers["capmox"] = proxmoxClient
+		setupLog.Info("Proxmox provider initialized successfully", "provider", "capmox")
+	}
+
 	// Create a simpler map for ReleaseReconciler (just provider names)
 	configuredProviders := make(map[string]interface{})
 	for k := range providers {
@@ -294,17 +323,19 @@ func main() {
 	}
 
 	if err = (&release.ReleaseReconciler{
-		Namespace: namespace,
-		Client:    mgr.GetClient(),
-		Providers: configuredProviders,
+		Namespace:            namespace,
+		Client:               mgr.GetClient(),
+		Providers:            configuredProviders,
+		ImageRetentionPeriod: imageRetentionPeriod,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Release")
 		os.Exit(1)
 	}
 	if err = (&imagecontroller.NodeImageReconciler{
-		S3Client:  s3Client,
-		Providers: providers,
-		Client:    mgr.GetClient(),
+		S3Client:             s3Client,
+		Providers:            providers,
+		Client:               mgr.GetClient(),
+		ImageRetentionPeriod: imageRetentionPeriod,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeImage")
 		os.Exit(1)

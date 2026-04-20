@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-13
+
+### Added
+
+- Make virtual hardware version configurable in VCD.
+
+## [0.9.0] - 2026-04-08
+
+### Added
+
+- Add Proxmox provider support for image distribution.
+
+## [0.8.0] - 2026-02-25
+
+### Added
+
+- Add `imageRetentionPeriod` helm value to configure delay of cleanup of unused images.
+
+## [0.7.0] - 2026-02-24
+
+### Changed
+
+- Use thin provisioning when uploading VM templates to vSphere.
+
 ## [0.6.0] - 2026-02-20
 
 ### Changed
@@ -77,7 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/giantswarm/image-distribution-operator/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/giantswarm/image-distribution-operator/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/giantswarm/image-distribution-operator/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/giantswarm/image-distribution-operator/compare/v0.5.0...v0.5.1
