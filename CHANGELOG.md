@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update module github.com/vmware/govmomi to v0.53.1.
 - Update module github.com/onsi/ginkgo/v2 to v2.28.2.
+- Update module sigs.k8s.io/controller-runtime to v0.23.3.
 
 ## [0.10.0] - 2026-04-13
 
