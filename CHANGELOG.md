@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update module github.com/vmware/govmomi to v0.53.1.
+
 ## [0.10.0] - 2026-04-13
 
 ### Added
