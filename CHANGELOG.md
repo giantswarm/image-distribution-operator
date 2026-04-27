@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update module github.com/vmware/govmomi to v0.53.1.
+- Update module github.com/onsi/ginkgo/v2 to v2.28.2.
 
 ## [0.10.0] - 2026-04-13
 
