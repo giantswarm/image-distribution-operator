@@ -11,6 +11,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	providerVSphere       = "vsphere"
+	providerCloudDirector = "cloud-director"
+	providerProxmox       = "proxmox"
+	providerCapV          = "capv"
+	providerCapVCD        = "capvcd"
+	providerCapMox        = "capmox"
+)
+
 func GetNodeImageFromRelease(release *releases.Release, flatcarChannel string) (*images.NodeImage, error) {
 	imageName, err := getImageName(release, flatcarChannel)
 	if err != nil {
@@ -114,7 +123,7 @@ func getReleaseComponent(release *releases.Release, component string) (releases.
 }
 
 func GetImageKey(nodeImage *images.NodeImage) string {
-	if nodeImage.Spec.Provider == "capmox" {
+	if nodeImage.Spec.Provider == providerCapMox {
 		return getQcow2ImageKey(nodeImage)
 	}
 	return getOVAImageKey(nodeImage)
@@ -129,8 +138,8 @@ func getOVAImageKey(nodeImage *images.NodeImage) string {
 
 	// Both capv and capvcd images are stored in the capv/ directory in S3
 	s3Provider := nodeImage.Spec.Provider
-	if s3Provider == "capvcd" {
-		s3Provider = "capv"
+	if s3Provider == providerCapVCD {
+		s3Provider = providerCapV
 	}
 
 	return fmt.Sprintf("%s/%s/%s.ova", s3Provider, nodeImage.Spec.Name, ovaFileName)
@@ -148,12 +157,12 @@ func getQcow2ImageKey(nodeImage *images.NodeImage) string {
 
 func getProviderFromProviderName(providerName string) string {
 	switch providerName {
-	case "vsphere":
-		return "capv"
-	case "cloud-director":
-		return "capvcd"
-	case "proxmox":
-		return "capmox"
+	case providerVSphere:
+		return providerCapV
+	case providerCloudDirector:
+		return providerCapVCD
+	case providerProxmox:
+		return providerCapMox
 	default:
 		return providerName
 	}

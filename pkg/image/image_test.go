@@ -21,36 +21,36 @@ func TestGetImageProvider(t *testing.T) {
 		{
 			name:             "case 0: vsphere release extracts vsphere provider",
 			releaseName:      "vsphere-1.2.3",
-			expectedProvider: "vsphere",
+			expectedProvider: providerVSphere,
 			expectError:      false,
 		},
 		{
 			name:             "case 1: cloud-director release extracts cloud-director provider",
 			releaseName:      "cloud-director-1.2.3",
-			expectedProvider: "cloud-director",
+			expectedProvider: providerCloudDirector,
 			expectError:      false,
 		},
 		{
 			name:             "case 2: vsphere release with patch version",
 			releaseName:      "vsphere-20.0.0",
-			expectedProvider: "vsphere",
+			expectedProvider: providerVSphere,
 			expectError:      false,
 		},
 		{
 			name:             "case 3: cloud-director release with patch version",
 			releaseName:      "cloud-director-0.10.5",
-			expectedProvider: "cloud-director",
+			expectedProvider: providerCloudDirector,
 			expectError:      false,
 		},
 		{
 			name:             "case 4: proxmox release extracts proxmox provider",
 			releaseName:      "proxmox-1.2.3",
-			expectedProvider: "proxmox",
+			expectedProvider: providerProxmox,
 			expectError:      false,
 		},
 		{
 			name:        "case 5: invalid release name without version",
-			releaseName: "vsphere",
+			releaseName: providerVSphere,
 			expectError: true,
 		},
 		{
@@ -82,18 +82,18 @@ func TestGetProviderFromProviderName(t *testing.T) {
 	}{
 		{
 			name:             "case 0: vsphere maps to capv",
-			providerName:     "vsphere",
-			expectedProvider: "capv",
+			providerName:     providerVSphere,
+			expectedProvider: providerCapV,
 		},
 		{
 			name:             "case 1: cloud-director maps to capvcd",
-			providerName:     "cloud-director",
-			expectedProvider: "capvcd",
+			providerName:     providerCloudDirector,
+			expectedProvider: providerCapVCD,
 		},
 		{
 			name:             "case 2: proxmox maps to capmox",
-			providerName:     "proxmox",
-			expectedProvider: "capmox",
+			providerName:     providerProxmox,
+			expectedProvider: providerCapMox,
 		},
 		{
 			name:             "case 3: unknown provider returns same name",
@@ -141,7 +141,7 @@ func TestGetNodeImageFromRelease(t *testing.T) {
 			},
 			flatcarChannel:     "stable",
 			expectedImageName:  "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-			expectedProvider:   "capv",
+			expectedProvider:   providerCapV,
 			expectedObjectName: "capv-flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
 			expectError:        false,
 		},
@@ -161,7 +161,7 @@ func TestGetNodeImageFromRelease(t *testing.T) {
 			},
 			flatcarChannel:     "stable",
 			expectedImageName:  "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-			expectedProvider:   "capvcd",
+			expectedProvider:   providerCapVCD,
 			expectedObjectName: "capvcd-flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
 			expectError:        false,
 		},
@@ -181,7 +181,7 @@ func TestGetNodeImageFromRelease(t *testing.T) {
 			},
 			flatcarChannel:     "stable",
 			expectedImageName:  "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-			expectedProvider:   "capmox",
+			expectedProvider:   providerCapMox,
 			expectedObjectName: "capmox-flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
 			expectError:        false,
 		},
@@ -246,7 +246,7 @@ func TestGetImageKey(t *testing.T) {
 			nodeImage: &images.NodeImage{
 				Spec: images.NodeImageSpec{
 					Name:     "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-					Provider: "capv",
+					Provider: providerCapV,
 				},
 			},
 			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
@@ -257,7 +257,7 @@ func TestGetImageKey(t *testing.T) {
 			nodeImage: &images.NodeImage{
 				Spec: images.NodeImageSpec{
 					Name:     "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-					Provider: "capvcd",
+					Provider: providerCapVCD,
 				},
 			},
 			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
@@ -268,7 +268,7 @@ func TestGetImageKey(t *testing.T) {
 			nodeImage: &images.NodeImage{
 				Spec: images.NodeImageSpec{
 					Name:     "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs",
-					Provider: "capmox",
+					Provider: providerCapMox,
 				},
 			},
 			expectedImageKey: "capmox/flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs/" +
@@ -279,7 +279,7 @@ func TestGetImageKey(t *testing.T) {
 			nodeImage: &images.NodeImage{
 				Spec: images.NodeImageSpec{
 					Name:     "flatcar-stable-3975.2.0-kube-1.29.0-tooling-1.18.1-gs",
-					Provider: "capv",
+					Provider: providerCapV,
 				},
 			},
 			expectedImageKey: "capv/flatcar-stable-3975.2.0-kube-1.29.0-tooling-1.18.1-gs/" +
