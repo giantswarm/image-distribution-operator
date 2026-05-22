@@ -141,11 +141,11 @@ datacenter-2:
 
 		assert.Equal(t, "pve-node-1", locations["datacenter-1"].Node)
 		assert.Equal(t, "local-lvm", locations["datacenter-1"].StoragePool)
-		assert.Equal(t, "local", locations["datacenter-1"].ImportStorage)
+		assert.Equal(t, defaultImportStorage, locations["datacenter-1"].ImportStorage)
 		assert.Equal(t, "vmbr0", locations["datacenter-1"].Bridge)
 
 		// ImportStorage should default to "local" when empty
-		assert.Equal(t, "local", locations["datacenter-2"].ImportStorage)
+		assert.Equal(t, defaultImportStorage, locations["datacenter-2"].ImportStorage)
 	})
 
 	t.Run("missing node returns error", func(t *testing.T) {
@@ -407,7 +407,7 @@ func TestCreateTemplate(t *testing.T) {
 				"dc1": {
 					Node:          "pve",
 					StoragePool:   "local-lvm",
-					ImportStorage: "local",
+					ImportStorage: defaultImportStorage,
 					Bridge:        "vmbr0",
 				},
 			},
@@ -466,7 +466,7 @@ func TestCreateTemplate(t *testing.T) {
 				"dc1": {
 					Node:          "pve",
 					StoragePool:   "local-lvm",
-					ImportStorage: "local",
+					ImportStorage: defaultImportStorage,
 					Bridge:        "vmbr0",
 				},
 			},
@@ -543,8 +543,8 @@ func TestDelete(t *testing.T) {
 func TestGetLocations(t *testing.T) {
 	client := &Client{
 		locations: map[string]*Location{
-			"dc1": {Node: "pve-1", StoragePool: "local-lvm", Bridge: "vmbr0", ImportStorage: "local"},
-			"dc2": {Node: "pve-2", StoragePool: "ceph", Bridge: "vmbr1", ImportStorage: "local"},
+			"dc1": {Node: "pve-1", StoragePool: "local-lvm", Bridge: "vmbr0", ImportStorage: defaultImportStorage},
+			"dc2": {Node: "pve-2", StoragePool: "ceph", Bridge: "vmbr1", ImportStorage: defaultImportStorage},
 		},
 	}
 

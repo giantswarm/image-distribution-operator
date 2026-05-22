@@ -48,6 +48,8 @@ type Config struct {
 	LocationsFile   string
 }
 
+const defaultImportStorage = "local"
+
 // taskResponse represents the Proxmox task status API response
 type taskResponse struct {
 	Data struct {
@@ -393,7 +395,7 @@ func loadLocations(path string) (map[string]*Location, error) {
 			return nil, fmt.Errorf("bridge is required for location %s", k)
 		}
 		if v.ImportStorage == "" {
-			locations[k].ImportStorage = "local"
+			locations[k].ImportStorage = defaultImportStorage
 		}
 	}
 
