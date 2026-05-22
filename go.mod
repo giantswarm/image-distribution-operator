@@ -13,7 +13,7 @@ require (
 	github.com/onsi/gomega v1.41.0
 	github.com/stretchr/testify v1.11.1
 	github.com/vmware/go-vcloud-director/v3 v3.0.0
-	github.com/vmware/govmomi v0.53.1
+	github.com/vmware/govmomi v0.54.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
