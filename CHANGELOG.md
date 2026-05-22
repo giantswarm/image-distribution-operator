@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Update module github.com/vmware/govmomi to v0.53.1.
+- Update module github.com/vmware/govmomi to v0.53.1.i
 - Update module github.com/onsi/ginkgo/v2 to v2.28.2.
 - Update module sigs.k8s.io/controller-runtime to v0.23.3.
+- Update module sigs.k8s.io/controller-runtime to v0.24.1.
+- Update kubernetes monorepo to v0.36.1.
+- Update aws-sdk-go-v2 monorepo.
+- Update module github.com/onsi/gomega to v1.41.0.
+- Update module github.com/onsi/ginkgo/v2 to v2.29.0.
+- Update module github.com/vmware/govmomi to v0.54.0.
+- Update module github.com/vmware/go-vcloud-director/v3 to v3.1.0.
 
 ## [0.10.0] - 2026-04-13
 
