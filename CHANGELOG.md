@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update module github.com/aws/aws-sdk-go-v2/config to v1.32.18.
+- Update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.102.0.
 
 ## [0.11.0] - 2026-05-22
 
