@@ -144,3 +144,5 @@ replace (
 	golang.org/x/net v0.30.0 => golang.org/x/net v0.39.0
 	k8s.io/apiserver v0.32.0 => k8s.io/apiserver v0.32.3
 )
+
+replace golang.org/x/sys v0.43.0 => golang.org/x/sys v0.45.0
