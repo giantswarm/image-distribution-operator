@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.102.0.
 - Update aws-sdk-go-v2 monorepo.
 - Go: Update dependencies.
+- API: Register `metav1` types for the `image.giantswarm.io/v1alpha1` group in the scheme.
 
 ## [0.11.0] - 2026-05-22
 

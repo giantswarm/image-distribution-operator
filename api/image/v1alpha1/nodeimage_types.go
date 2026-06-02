@@ -85,6 +85,7 @@ type NodeImageList struct {
 func init() {
 	SchemeBuilder.Register(func(s *runtime.Scheme) error {
 		s.AddKnownTypes(GroupVersion, &NodeImage{}, &NodeImageList{})
+		metav1.AddToGroupVersion(s, GroupVersion)
 		return nil
 	})
 }
