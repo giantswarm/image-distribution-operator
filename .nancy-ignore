@@ -5,3 +5,4 @@ CVE-2026-42506 until=2026-06-28 # golang.org/x/net@v0.53.0
 CVE-2026-39883 until=2026-06-27 # go.opentelemetry.io/otel/sdk@v1.40.0
 CVE-2026-25680 until=2026-06-28 # golang.org/x/net@v0.53.0
 CVE-2026-39821 until=2026-06-28 # golang.org/x/net@v0.53.0
+CVE-2026-5160 until=2026-07-15 # github.com/yuin/goldmark@v1.4.13
