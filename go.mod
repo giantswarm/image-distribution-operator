@@ -145,3 +145,5 @@ replace (
 )
 
 replace golang.org/x/sys v0.43.0 => golang.org/x/sys v0.45.0
+
+replace golang.org/x/crypto v0.51.0 => golang.org/x/crypto v0.53.0
