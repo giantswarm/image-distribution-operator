@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update aws-sdk-go-v2 monorepo.
 - Go: Update dependencies.
 - API: Register `metav1` types for the `image.giantswarm.io/v1alpha1` group in the scheme.
+- Extend Renovate config with GS golang config.
 
 ## [0.11.0] - 2026-05-22
 
