@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+> [!WARNING]  
+> Changes introduced in this release require additional configuration options to be passed to the Helm chart in order to retain existing functionality.
+
 - Remove superfluous build steps from the Dockerfile.
 - Add a Dockerfile for local development and testing.
 - Explicitly enable required providers and add backoff when initialisation fails.
-
+s
 ## [0.11.1] - 2026-06-02
 
 ### Changed

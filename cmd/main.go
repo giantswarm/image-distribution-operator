@@ -289,6 +289,7 @@ func main() {
 
 	backoff := wait.Backoff{
 		Duration: clientSetupRetryDuration,
+		Factor:   2.0,
 		Steps:    clientSetupRetrySteps,
 	}
 

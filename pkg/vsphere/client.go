@@ -83,7 +83,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vSphere client after %d retries: %w", c.Backoff.Steps, lastErr)
+		return nil, fmt.Errorf("failed to create vSphere client after %d attempts: %w", c.Backoff.Steps, lastErr)
 	} else {
 		log.Info("Successfully connected to vSphere", "vSphereURL", creds.VCenter)
 	}

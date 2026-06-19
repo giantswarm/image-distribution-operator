@@ -225,7 +225,7 @@
                     "type": "string"
                 },
                 "retryCount": {
-                    "type": "integer"
+                    "type": ["integer", "null"]
                 }
             }
         },
