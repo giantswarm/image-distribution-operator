@@ -68,19 +68,25 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}
 
 	var client *govmomi.Client
+	var lastErr error
 
-	_ = wait.ExponentialBackoff(c.Backoff,
+	err = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
-			client, err = govmomi.NewClient(ctx, u, true)
+			client, lastErr = govmomi.NewClient(ctx, u, true)
 
-			if err != nil {
-				msg := fmt.Sprintf("failed to create vSphere client after %d attempt(s)", c.Backoff.Steps)
-				log.Error(err, msg)
-				return false, nil
+			// Return if client was successfully created, otherwise retry
+			if lastErr == nil {
+				return true, nil
 			}
 
-			return true, nil
+			// Retry on any error
+			log.Info("Retrying authentication to vSphere")
+			return false, nil
 		})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vSphere client: %w", lastErr)
+	}
 
 	log.Info("Successfully connected to vSphere", "vSphereURL", creds.VCenter)
 
