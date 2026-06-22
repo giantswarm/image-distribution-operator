@@ -117,26 +117,21 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		locations:  locations,
 	}
 
-	var lastErr error
-
 	err = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
 			// Validate connectivity to Proxmox API
 			_, err = client.doRequest(ctx, http.MethodGet, "/version", nil)
 
 			if err != nil {
-				lastErr = err
+				msg := fmt.Sprintf("failed to create Proxmox client after %d attempt(s)", c.Backoff.Steps)
+				log.Error(err, msg)
 				return false, nil
 			}
 
 			return true, nil
 		})
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Proxmox client after %d attempts: %w", c.Backoff.Steps, lastErr)
-	} else {
-		log.Info("Successfully connected to Proxmox", "url", creds.URL)
-	}
+	log.Info("Successfully connected to Proxmox", "url", creds.URL)
 
 	return client, nil
 }

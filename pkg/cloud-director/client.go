@@ -62,25 +62,21 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}
 
 	vcdClient := govcd.NewVCDClient(*u, creds.Insecure)
-	var lastErr error
 
 	err = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
 			err = vcdClient.Authenticate(creds.Username, creds.Password, creds.Org)
 
 			if err != nil {
-				lastErr = err
+				msg := fmt.Sprintf("failed to create Cloud Director client after %d attempt(s)", c.Backoff.Steps)
+				log.Error(err, msg)
 				return false, nil
 			}
 
 			return true, nil
 		})
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Cloud Director client after %d attempts: %w", c.Backoff.Steps, lastErr)
-	} else {
-		log.Info("Successfully authenticated to Cloud Director", "vcdURL", creds.URL)
-	}
+	log.Info("Successfully authenticated to Cloud Director", "vcdURL", creds.URL)
 
 	location, err := loadLocation(c.LocationsFile)
 	if err != nil {

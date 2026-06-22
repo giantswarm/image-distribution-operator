@@ -297,6 +297,8 @@ func main() {
 	providers := make(map[string]provider.Provider)
 
 	if enableVsphere {
+		setupLog.Info("Initializing vSphere provider")
+
 		// Try to initialize vSphere provider
 		vsphereClient, err := vsphere.New(vsphere.Config{
 			CredentialsFile: vsphereCredentials,
@@ -315,6 +317,8 @@ func main() {
 	}
 
 	if enableCloudDirector {
+		setupLog.Info("Initializing Cloud Director provider")
+
 		// Try to initialize Cloud Director provider
 		vcdClient, err := clouddirector.New(clouddirector.Config{
 			CredentialsFile: vcdCredentials,
@@ -336,6 +340,8 @@ func main() {
 	}
 
 	if enableProxmox {
+		setupLog.Info("Initializing Proxmox provider")
+
 		// Try to initialize Proxmox provider
 		proxmoxClient, err := proxmox.New(proxmox.Config{
 			CredentialsFile: proxmoxCredentials,
