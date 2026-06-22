@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove superfluous build steps from the Dockerfile.
 - Add a Dockerfile for local development and testing.
+- Explicitly enable required providers and add backoff when initialisation fails.
 
 ## [0.11.1] - 2026-06-02
 

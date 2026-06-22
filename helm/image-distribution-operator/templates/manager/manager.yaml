@@ -45,6 +45,21 @@ spec:
             {{- if .Values.imageRetentionPeriod }}
             - --image-retention-period={{ .Values.imageRetentionPeriod }}
             {{- end }}
+            {{- if .Values.proxmox.enabled }}
+            - --enable-proxmox=true
+            {{- end }}
+            {{- if .Values.vcd.enabled }}
+            - --enable-cloud-director=true
+            {{- end }}
+            {{- if .Values.vsphere.enabled }}
+            - --enable-vsphere=true
+            {{- end }}
+            {{- if .Values.clientSetup.initialBackoffDelay }}
+            - --client-setup-retry-duration={{ .Values.clientSetup.initialBackoffDelay }}
+            {{- end }}
+            {{- if .Values.clientSetup.retryCount }}
+            - --client-setup-retry-steps={{ .Values.clientSetup.retryCount }}
+            {{- end }}
           command:
             - /manager
           image: "{{ .Values.controllerManager.container.image.repository }}:{{ include "image.tag" . }}"

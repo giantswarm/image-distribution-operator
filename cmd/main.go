@@ -31,6 +31,7 @@ import (
 	"github.com/giantswarm/releases/sdk/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
@@ -80,6 +81,13 @@ func main() {
 	var s3TimeoutSeconds int
 	var s3HTTP bool
 
+	var clientSetupRetryDuration time.Duration
+	var clientSetupRetrySteps int
+
+	var enableCloudDirector bool
+	var enableProxmox bool
+	var enableVsphere bool
+
 	var vsphereCredentials string
 	var vsphereLocations string
 	var vspherePullFromURL bool
@@ -98,6 +106,16 @@ func main() {
 	flag.StringVar(&s3Region, "s3-region", "", "The region where the S3 bucket is located.")
 	flag.IntVar(&s3TimeoutSeconds, "s3-timeout-seconds", 90, "The timeout in seconds for S3 pull operations.")
 	flag.BoolVar(&s3HTTP, "s3-http", false, "Use HTTP instead of HTTPS for S3 operations.")
+
+	flag.DurationVar(&clientSetupRetryDuration, "client-setup-retry-duration", 5*time.Second,
+		"The initial duration to wait between retries when setting up provider clients.")
+	flag.IntVar(&clientSetupRetrySteps, "client-setup-retry-steps", 5,
+		"The number of retry attempts when setting up provider clients.")
+
+	flag.BoolVar(&enableCloudDirector, "enable-cloud-director", false, "Enable the Cloud Director provider.")
+	flag.BoolVar(&enableProxmox, "enable-proxmox", false, "Enable the Proxmox provider.")
+	flag.BoolVar(&enableVsphere, "enable-vsphere", false, "Enable the vSphere provider.")
+
 	flag.StringVar(&vsphereCredentials, "vsphere-credentials", "/home/.vsphere/credentials",
 		"The file containing the credentials for vSphere resources.")
 	flag.StringVar(&vsphereLocations, "vsphere-locations", "/home/.vsphere/locations",
@@ -269,51 +287,71 @@ func main() {
 		os.Exit(1)
 	}
 
+	backoff := wait.Backoff{
+		Duration: clientSetupRetryDuration,
+		Steps:    clientSetupRetrySteps,
+	}
+
 	// Initialize provider registry - providers that fail to initialize are logged but don't stop startup
 	providers := make(map[string]provider.Provider)
 
-	// Try to initialize vSphere provider
-	vsphereClient, err := vsphere.New(vsphere.Config{
-		CredentialsFile: vsphereCredentials,
-		LocationsFile:   vsphereLocations,
-		PullMode:        vspherePullFromURL,
-	}, context.Background())
-	if err != nil {
-		setupLog.Info("vSphere provider not configured - will fail if NodeImage references 'capv' provider", "error", err)
-	} else {
-		providers["capv"] = vsphereClient
-		setupLog.Info("vSphere provider initialized successfully", "provider", "capv")
+	if enableVsphere {
+		// Try to initialize vSphere provider
+		vsphereClient, err := vsphere.New(vsphere.Config{
+			CredentialsFile: vsphereCredentials,
+			LocationsFile:   vsphereLocations,
+			PullMode:        vspherePullFromURL,
+			Backoff:         backoff,
+		}, context.Background())
+		if err != nil {
+			setupLog.Info("vSphere provider not successfully initialized", "error", err)
+			// Exit with an error if the provider wasn't successfully initialized
+			os.Exit(1)
+		} else {
+			providers["capv"] = vsphereClient
+			setupLog.Info("vSphere provider initialized successfully", "provider", "capv")
+		}
 	}
 
-	// Try to initialize Cloud Director provider
-	vcdClient, err := clouddirector.New(clouddirector.Config{
-		CredentialsFile: vcdCredentials,
-		LocationsFile:   vcdLocations,
-		DownloadDir:     vcdDownloadDir,
-	}, context.Background())
-	if err != nil {
-		setupLog.Info(
-			"Cloud Director provider not configured - will fail if NodeImage references 'capvcd' provider",
-			"error", err,
-		)
-	} else {
-		providers["capvcd"] = vcdClient
-		setupLog.Info("Cloud Director provider initialized successfully", "provider", "capvcd")
+	if enableCloudDirector {
+		// Try to initialize Cloud Director provider
+		vcdClient, err := clouddirector.New(clouddirector.Config{
+			CredentialsFile: vcdCredentials,
+			LocationsFile:   vcdLocations,
+			DownloadDir:     vcdDownloadDir,
+			Backoff:         backoff,
+		}, context.Background())
+		if err != nil {
+			setupLog.Info(
+				"Cloud Director provider not successfully initialized",
+				"error", err,
+			)
+			// Exit with an error if the provider wasn't successfully initialized
+			os.Exit(1)
+		} else {
+			providers["capvcd"] = vcdClient
+			setupLog.Info("Cloud Director provider initialized successfully", "provider", "capvcd")
+		}
 	}
 
-	// Try to initialize Proxmox provider
-	proxmoxClient, err := proxmox.New(proxmox.Config{
-		CredentialsFile: proxmoxCredentials,
-		LocationsFile:   proxmoxLocations,
-	}, context.Background())
-	if err != nil {
-		setupLog.Info(
-			"Proxmox provider not configured - will fail if NodeImage references 'capmox' provider",
-			"error", err,
-		)
-	} else {
-		providers["capmox"] = proxmoxClient
-		setupLog.Info("Proxmox provider initialized successfully", "provider", "capmox")
+	if enableProxmox {
+		// Try to initialize Proxmox provider
+		proxmoxClient, err := proxmox.New(proxmox.Config{
+			CredentialsFile: proxmoxCredentials,
+			LocationsFile:   proxmoxLocations,
+			Backoff:         backoff,
+		}, context.Background())
+		if err != nil {
+			setupLog.Info(
+				"Proxmox provider not successfully initialized",
+				"error", err,
+			)
+			// Exit with an error if the provider wasn't successfully initialized
+			os.Exit(1)
+		} else {
+			providers["capmox"] = proxmoxClient
+			setupLog.Info("Proxmox provider initialized successfully", "provider", "capmox")
+		}
 	}
 
 	// Create a simpler map for ReleaseReconciler (just provider names)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -44,6 +45,7 @@ type Location struct {
 
 // Config holds the configuration for the Proxmox client
 type Config struct {
+	Backoff         wait.Backoff
 	CredentialsFile string
 	LocationsFile   string
 }
@@ -115,12 +117,26 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		locations:  locations,
 	}
 
-	// Validate connectivity
-	if _, err := client.doRequest(ctx, http.MethodGet, "/version", nil); err != nil {
-		return nil, fmt.Errorf("failed to connect to Proxmox API: %w", err)
-	}
+	var lastErr error
 
-	log.Info("Successfully connected to Proxmox", "url", creds.URL)
+	err = wait.ExponentialBackoff(c.Backoff,
+		func() (done bool, err error) {
+			// Validate connectivity to Proxmox API
+			_, err = client.doRequest(ctx, http.MethodGet, "/version", nil)
+
+			if err != nil {
+				lastErr = err
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Proxmox client after %d retries: %w", c.Backoff.Steps, lastErr)
+	} else {
+		log.Info("Successfully connected to Proxmox", "url", creds.URL)
+	}
 
 	return client, nil
 }

@@ -218,6 +218,17 @@
                 }
             }
         },
+        "clientSetup": {
+            "type": "object",
+            "properties": {
+                "initialBackoffDelay": {
+                    "type": "string"
+                },
+                "retryCount": {
+                    "type": "integer"
+                }
+            }
+        },
         "vcd": {
             "type": "object",
             "properties": {
@@ -243,6 +254,9 @@
                 },
                 "downloadDir": {
                     "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "locations": {
                     "type": "object",
@@ -290,6 +304,9 @@
                         }
                     }
                 },
+                "enabled": {
+                    "type": "boolean"
+                },
                 "locations": {
                     "type": "object"
                 }
@@ -311,6 +328,9 @@
                             "type": "string"
                         }
                     }
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "locations": {
                     "type": "object"
