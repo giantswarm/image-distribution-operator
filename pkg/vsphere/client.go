@@ -69,7 +69,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 	var client *govmomi.Client
 
-	err = wait.ExponentialBackoff(c.Backoff,
+	_ = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
 			client, err = govmomi.NewClient(ctx, u, true)
 

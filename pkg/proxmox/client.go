@@ -117,7 +117,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		locations:  locations,
 	}
 
-	err = wait.ExponentialBackoff(c.Backoff,
+	_ = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
 			// Validate connectivity to Proxmox API
 			_, err = client.doRequest(ctx, http.MethodGet, "/version", nil)

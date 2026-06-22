@@ -63,7 +63,7 @@ func New(c Config, ctx context.Context) (*Client, error) {
 
 	vcdClient := govcd.NewVCDClient(*u, creds.Insecure)
 
-	err = wait.ExponentialBackoff(c.Backoff,
+	_ = wait.ExponentialBackoff(c.Backoff,
 		func() (done bool, err error) {
 			err = vcdClient.Authenticate(creds.Username, creds.Password, creds.Org)
 
