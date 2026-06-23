@@ -80,12 +80,20 @@ networkPolicy:
 # Example values: "720h" (30 days), "2160h" (90 days)
 imageRetentionPeriod: "0"
 
+# Configuration for the provider client setup
+clientSetup:
+  # Initial backoff delay, default 5s
+  initialBackoffDelay: ""
+  # Maximium retry count, default 5
+  retryCount:
+
 vsphere:
   pullFromURL: false
   credentials:
     username: ""
     password: ""
     vcenter: ""
+  enabled: false
   locations: {}
 
 vcd:
@@ -96,6 +104,7 @@ vcd:
     password: ""
     org: ""
     insecure: false
+  enabled: false
   locations:
     name: ""
     vdc: ""
@@ -110,6 +119,7 @@ proxmox:
     tokenId: ""
     secret: ""
     insecure: false
+  enabled: false
   locations: {}
 
 s3:
