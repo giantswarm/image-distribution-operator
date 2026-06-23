@@ -1,4 +1,4 @@
-{{- if .Values.proxmox.locations }}
+{{- if and .Values.proxmox.locations .Values.proxmox.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
