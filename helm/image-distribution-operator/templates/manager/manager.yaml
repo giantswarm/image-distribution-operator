@@ -84,32 +84,32 @@ spec:
           volumeMounts:
             - mountPath: /tmp
               name: image-storage
-            {{- if .Values.vsphere.credentials }}
+            {{- if and .Values.vsphere.credentials .Values.vsphere.enabled }}
             - mountPath: /home/.vsphere/credentials
               name: vsphere-credentials
               subPath: credentials
             {{- end }}
-            {{- if .Values.vsphere.locations }}
+            {{- if and .Values.vsphere.locations .Values.vsphere.enabled }}
             - mountPath: /home/.vsphere/locations
               name: vsphere-locations
               subPath: locations
             {{- end }}
-            {{- if .Values.vcd.credentials }}
+            {{- if and .Values.vcd.credentials .Values.vcd.enabled }}
             - mountPath: /home/.vcd/credentials
               name: vcd-credentials
               subPath: credentials
             {{- end }}
-            {{- if .Values.vcd.locations }}
+            {{- if and .Values.vcd.locations .Values.vcd.enabled }}
             - mountPath: /home/.vcd/locations
               name: vcd-locations
               subPath: locations
             {{- end }}
-            {{- if .Values.proxmox.credentials }}
+            {{- if and .Values.proxmox.credentials .Values.proxmox.enabled }}
             - mountPath: /home/.proxmox/credentials
               name: proxmox-credentials
               subPath: credentials
             {{- end }}
-            {{- if .Values.proxmox.locations }}
+            {{- if and .Values.proxmox.locations .Values.proxmox.enabled }}
             - mountPath: /home/.proxmox/locations
               name: proxmox-locations
               subPath: locations
@@ -126,32 +126,32 @@ spec:
       volumes:
         - name: image-storage
           emptyDir: {}
-        {{- if .Values.vsphere.credentials }}
+        {{- if and .Values.vsphere.credentials .Values.vsphere.enabled }}
         - name: vsphere-credentials
           secret:
             secretName: image-distribution-operator-vsphere-credentials
         {{- end }}
-        {{- if .Values.vsphere.locations }}
+        {{- if and .Values.vsphere.locations .Values.vsphere.enabled }}
         - name: vsphere-locations
           configMap:
             name: image-distribution-operator-vsphere-locations
         {{- end }}
-        {{- if .Values.vcd.credentials }}
+        {{- if and .Values.vcd.credentials .Values.vcd.enabled }}
         - name: vcd-credentials
           secret:
             secretName: image-distribution-operator-vcd-credentials
         {{- end }}
-        {{- if .Values.vcd.locations }}
+        {{- if and .Values.vcd.locations .Values.vcd.enabled }}
         - name: vcd-locations
           configMap:
             name: image-distribution-operator-vcd-locations
         {{- end }}
-        {{- if .Values.proxmox.credentials }}
+        {{- if and .Values.proxmox.credentials .Values.proxmox.enabled }}
         - name: proxmox-credentials
           secret:
             secretName: image-distribution-operator-proxmox-credentials
         {{- end }}
-        {{- if .Values.proxmox.locations }}
+        {{- if and .Values.proxmox.locations .Values.proxmox.enabled }}
         - name: proxmox-locations
           configMap:
             name: image-distribution-operator-proxmox-locations
