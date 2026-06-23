@@ -219,8 +219,6 @@ github.com/vmware/go-vcloud-director/v3 v3.1.0 h1:nxu8orp0hXCH0YWiitjkBOZyllCLZK
 github.com/vmware/go-vcloud-director/v3 v3.1.0/go.mod h1:QLkQYCyYqToIKk22ARQpsGa6iioRLfY/yi66PZbrnPs=
 github.com/vmware/govmomi v0.54.1 h1:K30mfqTYE/xMbka2EHLAucxL5VOXrPstMUTbHdETNIg=
 github.com/vmware/govmomi v0.54.1/go.mod h1:/1lqYPsCaC3Rf+WTgMcuvs+TqJVEvLX1O4oJ51pIw4E=
-github.com/vmware/vsphere-automation-sdk-go/runtime v0.8.0 h1:KnDIX9LY0nru7iMQTg0sy9vChhyorPo5OdASM2MaAcI=
-github.com/vmware/vsphere-automation-sdk-go/runtime v0.8.0/go.mod h1:DzLetYAmw1+vj7bqElRWEpuy40WYE/woL3alsymYa/c=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
