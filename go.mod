@@ -12,7 +12,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.41.0
 	github.com/stretchr/testify v1.11.1
-	github.com/vmware/go-vcloud-director/v3 v3.1.0
+	github.com/vmware/go-vcloud-director/v3 v3.1.1
 	github.com/vmware/govmomi v0.54.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.36.2
