@@ -12,6 +12,7 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -42,6 +43,7 @@ type Location struct {
 
 // Config holds the configuration for the vSphere client
 type Config struct {
+	Backoff         wait.Backoff
 	CredentialsFile string
 	LocationsFile   string
 	PullMode        bool
@@ -65,9 +67,25 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		User:   url.UserPassword(creds.Username, creds.Password),
 	}
 
-	client, err := govmomi.NewClient(ctx, u, true)
+	var client *govmomi.Client
+	var lastErr error
+
+	err = wait.ExponentialBackoff(c.Backoff,
+		func() (done bool, err error) {
+			client, lastErr = govmomi.NewClient(ctx, u, true)
+
+			// Return if client was successfully created, otherwise retry
+			if lastErr == nil {
+				return true, nil
+			}
+
+			// Retry on any error
+			log.Info("Retrying authentication to vSphere")
+			return false, nil
+		})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vSphere client:\n%w", err)
+		return nil, fmt.Errorf("failed to create vSphere client: %w", lastErr)
 	}
 
 	log.Info("Successfully connected to vSphere", "vSphereURL", creds.VCenter)

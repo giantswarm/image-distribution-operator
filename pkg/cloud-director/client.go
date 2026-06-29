@@ -8,6 +8,7 @@ import (
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,6 +39,7 @@ type Location struct {
 
 // Config holds the configuration for the cloudDirector client
 type Config struct {
+	Backoff         wait.Backoff
 	CredentialsFile string
 	LocationsFile   string
 	DownloadDir     string
@@ -59,13 +61,28 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("unable to parse URL: %w", err)
 	}
 
+	var lastErr error
 	vcdClient := govcd.NewVCDClient(*u, creds.Insecure)
-	err = vcdClient.Authenticate(creds.Username, creds.Password, creds.Org)
+
+	err = wait.ExponentialBackoff(c.Backoff,
+		func() (done bool, err error) {
+			lastErr = vcdClient.Authenticate(creds.Username, creds.Password, creds.Org)
+
+			// Return if client was successfully created, otherwise retry
+			if lastErr == nil {
+				return true, nil
+			}
+
+			// Retry on any error
+			log.Info("Retrying authentication to VCD")
+			return false, nil
+		})
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to authenticate: %w", err)
+		return nil, fmt.Errorf("failed to create Cloud Director client: %w", lastErr)
 	}
 
-	log.Info("Successfully connected to Cloud Director", "vcdURL", creds.URL)
+	log.Info("Successfully authenticated to Cloud Director", "vcdURL", creds.URL)
 
 	location, err := loadLocation(c.LocationsFile)
 	if err != nil {
