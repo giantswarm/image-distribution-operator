@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update module github.com/vmware/govmomi to v0.55.0.
+- Update github.com/aws/aws-sdk-go-v2 to v1.42.0.
+- Update github.com/aws/aws-sdk-go-v2/config to v1.32.25.
+- Update github.com/aws/aws-sdk-go-v2/service/s3 to v1.104.0.
 
 ## [0.12.1] - 2026-06-26
 
