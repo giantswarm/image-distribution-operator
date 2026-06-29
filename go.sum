@@ -70,8 +70,8 @@ github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/giantswarm/microerror v0.4.1 h1:WMiD7HQASoUA9lZzPlPK+erCEOJ0uT4cyo18VfCXHD0=
 github.com/giantswarm/microerror v0.4.1/go.mod h1:URFj0gFCmZihjya6saQCXxslBrgctXb4NsXYHB5JdrI=
-github.com/giantswarm/releases/sdk v0.12.0 h1:zL62k34FtB2Yv+Y6K739D/eKHMl0pqauy2C/W2Sex8I=
-github.com/giantswarm/releases/sdk v0.12.0/go.mod h1:HFalCuZ2YHtfMXM/Yb4Mr7oF68itKYHSdpFLPM+/Xbk=
+github.com/giantswarm/releases/sdk v0.13.0 h1:xEAO+rI820X/XTeMDF2IowmBKEbHQ0PS5LkpDAMRmmY=
+github.com/giantswarm/releases/sdk v0.13.0/go.mod h1:YBRAKlJhZkt3hIxOIuQN5CD7A67it67s7GjGaE1yedU=
 github.com/gkampitakis/ciinfo v0.3.2 h1:JcuOPk8ZU7nZQjdUhctuhQofk7BGHuIy0c9Ez8BNhXs=
 github.com/gkampitakis/ciinfo v0.3.2/go.mod h1:1NIwaOcFChN4fa/B0hEBdAb6npDlFL8Bwx4dfRLRqAo=
 github.com/gkampitakis/go-diff v1.3.2 h1:Qyn0J9XJSDTgnsgHRdz9Zp24RaJeKMUHg2+PDZZdC4M=

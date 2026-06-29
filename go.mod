@@ -1,6 +1,6 @@
 module github.com/giantswarm/image-distribution-operator
 
-go 1.26.2
+go 1.26.3
 
 godebug default=go1.23
 
@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.41.9
 	github.com/aws/aws-sdk-go-v2/config v1.32.20
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.102.2
-	github.com/giantswarm/releases/sdk v0.12.0
+	github.com/giantswarm/releases/sdk v0.13.0
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
 	github.com/stretchr/testify v1.11.1
