@@ -14,20 +14,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// sessionRefreshThreshold is kept comfortably under Cloud Director's observed
-// ~24h absolute session lifetime, so sessions get refreshed before they can
-// expire mid-reconcile.
-const sessionRefreshThreshold = 20 * time.Hour
+// defaultSessionRefreshThreshold is kept comfortably under Cloud Director's
+// observed ~24h absolute session lifetime, so sessions get refreshed before
+// they can expire mid-reconcile. Used when Config.SessionRefreshThreshold is
+// left unset.
+const defaultSessionRefreshThreshold = 20 * time.Hour
 
 // Client wraps the govcd client
 type Client struct {
-	cloudDirector   *govcd.VCDClient
-	url             string
-	location        *Location
-	downloadDir     string
-	credentials     *Credentials
-	backoff         wait.Backoff
-	authenticatedAt time.Time
+	cloudDirector           *govcd.VCDClient
+	url                     string
+	location                *Location
+	downloadDir             string
+	credentials             *Credentials
+	backoff                 wait.Backoff
+	authenticatedAt         time.Time
+	sessionRefreshThreshold time.Duration
 }
 
 type Credentials struct {
@@ -49,10 +51,11 @@ type Location struct {
 
 // Config holds the configuration for the cloudDirector client
 type Config struct {
-	Backoff         wait.Backoff
-	CredentialsFile string
-	LocationsFile   string
-	DownloadDir     string
+	Backoff                 wait.Backoff
+	CredentialsFile         string
+	LocationsFile           string
+	DownloadDir             string
+	SessionRefreshThreshold time.Duration
 }
 
 // New initializes a new cloudDirector client
@@ -77,13 +80,19 @@ func New(c Config, ctx context.Context) (*Client, error) {
 	}
 	location.Org = creds.Org
 
+	sessionRefreshThreshold := c.SessionRefreshThreshold
+	if sessionRefreshThreshold <= 0 {
+		sessionRefreshThreshold = defaultSessionRefreshThreshold
+	}
+
 	client := &Client{
-		cloudDirector: govcd.NewVCDClient(*u, creds.Insecure),
-		url:           creds.URL,
-		location:      location,
-		downloadDir:   c.DownloadDir,
-		credentials:   creds,
-		backoff:       c.Backoff,
+		cloudDirector:           govcd.NewVCDClient(*u, creds.Insecure),
+		url:                     creds.URL,
+		location:                location,
+		downloadDir:             c.DownloadDir,
+		credentials:             creds,
+		backoff:                 c.Backoff,
+		sessionRefreshThreshold: sessionRefreshThreshold,
 	}
 
 	if err := client.authenticate(ctx); err != nil {
@@ -126,7 +135,7 @@ func (c *Client) authenticate(ctx context.Context) error {
 // is old enough that it may have expired, so callers never have to deal with
 // a stale session themselves.
 func (c *Client) ensureSession(ctx context.Context) error {
-	if time.Since(c.authenticatedAt) < sessionRefreshThreshold {
+	if time.Since(c.authenticatedAt) < c.sessionRefreshThreshold {
 		return nil
 	}
 

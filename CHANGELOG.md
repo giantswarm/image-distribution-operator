@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Refresh the Cloud Director session proactively before it expires, and retry once on a stale-session error, instead of failing every reconcile with a misleading "entity not found" error until the operator is restarted. The refresh threshold is configurable via `--vcd-session-refresh-threshold` / `vcd.sessionRefreshThreshold`, defaulting to 20h.
+
 ### Changed
 
 - Update module github.com/vmware/govmomi to v0.55.0.

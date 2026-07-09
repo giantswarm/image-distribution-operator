@@ -95,6 +95,7 @@ func main() {
 	var vcdCredentials string
 	var vcdLocations string
 	var vcdDownloadDir string
+	var vcdSessionRefreshThreshold time.Duration
 
 	var proxmoxCredentials string
 	var proxmoxLocations string
@@ -129,6 +130,8 @@ func main() {
 		"The file containing the locations for VMware Cloud Director resources.")
 	flag.StringVar(&vcdDownloadDir, "vcd-download-dir", "/tmp/images",
 		"The directory where VCD images are downloaded.")
+	flag.DurationVar(&vcdSessionRefreshThreshold, "vcd-session-refresh-threshold", 20*time.Hour,
+		"The age at which the Cloud Director session is proactively refreshed. Should be kept below VCD's session lifetime.")
 
 	flag.StringVar(&proxmoxCredentials, "proxmox-credentials", "/home/.proxmox/credentials",
 		"The file containing the credentials for Proxmox resources.")
@@ -321,10 +324,11 @@ func main() {
 
 		// Try to initialize Cloud Director provider
 		vcdClient, err := clouddirector.New(clouddirector.Config{
-			CredentialsFile: vcdCredentials,
-			LocationsFile:   vcdLocations,
-			DownloadDir:     vcdDownloadDir,
-			Backoff:         backoff,
+			CredentialsFile:         vcdCredentials,
+			LocationsFile:           vcdLocations,
+			DownloadDir:             vcdDownloadDir,
+			SessionRefreshThreshold: vcdSessionRefreshThreshold,
+			Backoff:                 backoff,
 		}, context.Background())
 		if err != nil {
 			setupLog.Info(
