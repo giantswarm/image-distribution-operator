@@ -2,9 +2,11 @@ package clouddirector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
 	"gopkg.in/yaml.v3"
@@ -12,12 +14,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// sessionRefreshThreshold is kept comfortably under Cloud Director's observed
+// ~24h absolute session lifetime, so sessions get refreshed before they can
+// expire mid-reconcile.
+const sessionRefreshThreshold = 20 * time.Hour
+
 // Client wraps the govcd client
 type Client struct {
-	cloudDirector *govcd.VCDClient
-	url           string
-	location      *Location
-	downloadDir   string
+	cloudDirector   *govcd.VCDClient
+	url             string
+	location        *Location
+	downloadDir     string
+	credentials     *Credentials
+	backoff         wait.Backoff
+	authenticatedAt time.Time
 }
 
 type Credentials struct {
@@ -61,12 +71,38 @@ func New(c Config, ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("unable to parse URL: %w", err)
 	}
 
-	var lastErr error
-	vcdClient := govcd.NewVCDClient(*u, creds.Insecure)
+	location, err := loadLocation(c.LocationsFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load locations file:\n%w", err)
+	}
+	location.Org = creds.Org
 
-	err = wait.ExponentialBackoff(c.Backoff,
+	client := &Client{
+		cloudDirector: govcd.NewVCDClient(*u, creds.Insecure),
+		url:           creds.URL,
+		location:      location,
+		downloadDir:   c.DownloadDir,
+		credentials:   creds,
+		backoff:       c.Backoff,
+	}
+
+	if err := client.authenticate(ctx); err != nil {
+		return nil, fmt.Errorf("failed to create Cloud Director client: %w", err)
+	}
+
+	return client, nil
+}
+
+// authenticate logs in to Cloud Director, retrying with backoff, and records
+// the time of the successful login so ensureSession can tell when a refresh
+// is due.
+func (c *Client) authenticate(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	var lastErr error
+	err := wait.ExponentialBackoff(c.backoff,
 		func() (done bool, err error) {
-			lastErr = vcdClient.Authenticate(creds.Username, creds.Password, creds.Org)
+			lastErr = c.cloudDirector.Authenticate(c.credentials.Username, c.credentials.Password, c.credentials.Org)
 
 			// Return if client was successfully created, otherwise retry
 			if lastErr == nil {
@@ -77,25 +113,27 @@ func New(c Config, ctx context.Context) (*Client, error) {
 			log.Info("Retrying authentication to VCD")
 			return false, nil
 		})
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Cloud Director client: %w", lastErr)
+		return lastErr
 	}
 
-	log.Info("Successfully authenticated to Cloud Director", "vcdURL", creds.URL)
+	c.authenticatedAt = time.Now()
+	log.Info("Successfully authenticated to Cloud Director", "vcdURL", c.url)
+	return nil
+}
 
-	location, err := loadLocation(c.LocationsFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load locations file:\n%w", err)
+// ensureSession re-authenticates with Cloud Director if the current session
+// is old enough that it may have expired, so callers never have to deal with
+// a stale session themselves.
+func (c *Client) ensureSession(ctx context.Context) error {
+	if time.Since(c.authenticatedAt) < sessionRefreshThreshold {
+		return nil
 	}
 
-	location.Org = creds.Org
-	return &Client{
-		cloudDirector: vcdClient,
-		url:           creds.URL,
-		location:      location,
-		downloadDir:   c.DownloadDir,
-	}, nil
+	if err := c.authenticate(ctx); err != nil {
+		return fmt.Errorf("failed to refresh Cloud Director session: %w", err)
+	}
+	return nil
 }
 
 // GetLocations returns all configured cloudDirector locations
@@ -109,7 +147,7 @@ func (c *Client) GetLocations() map[string]interface{} {
 func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, error) {
 	log := log.FromContext(ctx)
 
-	catalog, err := c.getCatalog()
+	catalog, err := c.getCatalog(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -132,7 +170,7 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 func (c *Client) Delete(ctx context.Context, name string, loc string) error {
 	log := log.FromContext(ctx)
 
-	catalog, err := c.getCatalog()
+	catalog, err := c.getCatalog(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get catalog: %w", err)
 	}
@@ -168,7 +206,7 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 	log := log.FromContext(ctx)
 
 	// Get the catalog where we'll upload
-	catalog, err := c.getCatalog()
+	catalog, err := c.getCatalog(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get catalog: %w", err)
 	}
@@ -193,9 +231,21 @@ func (c *Client) Create(ctx context.Context, imageURL string, imageName string, 
 	return nil
 }
 
-// getOrg returns the organization object
-func (c *Client) getOrg() (*govcd.Org, error) {
+// getOrg returns the organization object. go-vcloud-director reports an
+// expired session as ErrorEntityNotFound here - indistinguishable from the
+// org actually being missing - so on that specific error it forces a
+// re-authentication and retries once before giving up.
+func (c *Client) getOrg(ctx context.Context) (*govcd.Org, error) {
+	if err := c.ensureSession(ctx); err != nil {
+		return nil, err
+	}
+
 	org, err := c.cloudDirector.GetOrgByName(c.location.Org)
+	if errors.Is(err, govcd.ErrorEntityNotFound) {
+		if reauthErr := c.authenticate(ctx); reauthErr == nil {
+			org, err = c.cloudDirector.GetOrgByName(c.location.Org)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization %s: %w", c.location.Org, err)
 	}
@@ -203,8 +253,8 @@ func (c *Client) getOrg() (*govcd.Org, error) {
 }
 
 // getCatalog returns the catalog object
-func (c *Client) getCatalog() (*govcd.Catalog, error) {
-	org, err := c.getOrg()
+func (c *Client) getCatalog(ctx context.Context) (*govcd.Catalog, error) {
+	org, err := c.getOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
