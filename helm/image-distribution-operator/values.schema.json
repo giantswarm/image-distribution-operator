@@ -275,6 +275,9 @@
                             "type": "string"
                         }
                     }
+                },
+                "sessionRefreshThreshold": {
+                    "type": "string"
                 }
             }
         },

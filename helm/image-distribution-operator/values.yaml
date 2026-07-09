@@ -98,6 +98,9 @@ vsphere:
 
 vcd:
   downloadDir: "/tmp/images"
+  # The age at which the Cloud Director session is proactively refreshed.
+  # Should be kept below VCD's session lifetime.
+  sessionRefreshThreshold: "20h"
   credentials:
     url: ""
     username: ""
