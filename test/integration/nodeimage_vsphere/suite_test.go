@@ -57,6 +57,21 @@ const (
 	// its own vcsim template, independent of the create test's inventory.
 	testDeleteResourceName = "vsphere-test-image-delete"
 	testDeleteImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-delete-gs"
+
+	// Ginkgo randomizes spec order, so every spec below owns a distinct
+	// resource/image name to keep its vcsim inventory independent.
+
+	// Idempotency test: valid OVA seeded, imported then re-reconciled.
+	testIdempotentResourceName = "vsphere-test-image-idempotent"
+	testIdempotentImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-idempotent-gs"
+
+	// Missing test: deliberately NOT seeded into the fake bucket.
+	testMissingResourceName = "vsphere-test-image-missing"
+	testMissingImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-missing-gs"
+
+	// Error test: seeded with garbage bytes so the OVF import fails.
+	testErrorResourceName = "vsphere-test-image-error"
+	testErrorImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-error-gs"
 )
 
 var (
@@ -125,6 +140,19 @@ var _ = BeforeSuite(func() {
 		Spec: imagev1alpha1.NodeImageSpec{Name: testDeleteImageName, Provider: testProvider},
 	})
 	Expect(fakeS3.Seed(deleteImageKey, ova)).To(Succeed())
+
+	idempotentImageKey := imagekey.GetImageKey(&imagev1alpha1.NodeImage{
+		Spec: imagev1alpha1.NodeImageSpec{Name: testIdempotentImageName, Provider: testProvider},
+	})
+	Expect(fakeS3.Seed(idempotentImageKey, ova)).To(Succeed())
+
+	// Seeded with bytes that are not a valid OVA so the vSphere import fails.
+	errorImageKey := imagekey.GetImageKey(&imagev1alpha1.NodeImage{
+		Spec: imagev1alpha1.NodeImageSpec{Name: testErrorImageName, Provider: testProvider},
+	})
+	Expect(fakeS3.Seed(errorImageKey, []byte("not a valid ova"))).To(Succeed())
+
+	// testMissingImageName is intentionally left unseeded.
 
 	// Must run before constructing the vSphere client: govmomi's soap client
 	// inherits DialContext from http.DefaultTransport at construction time.

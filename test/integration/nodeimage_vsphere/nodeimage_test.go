@@ -124,6 +124,138 @@ var _ = Describe("NodeImage vSphere reconciliation", func() {
 		err = k8sClient.Get(ctx, namespacedName, &imagev1alpha1.NodeImage{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
+
+	It("does not re-import when the template already exists", func() {
+		namespacedName := types.NamespacedName{Name: testIdempotentResourceName, Namespace: "default"}
+		templatePath := testutil.VCSimFolder + "/" + testIdempotentImageName
+
+		By("creating and importing the NodeImage")
+		nodeImage := &imagev1alpha1.NodeImage{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testIdempotentResourceName,
+				Namespace: "default",
+			},
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     testIdempotentImageName,
+				Provider: testProvider,
+			},
+		}
+		Expect(k8sClient.Create(ctx, nodeImage)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, nodeImage)
+		})
+
+		nodeImage.Status.Releases = []string{"vsphere-1.2.3"}
+		nodeImage.Status.State = imagev1alpha1.NodeImagePending
+		Expect(k8sClient.Status().Update(ctx, nodeImage)).To(Succeed())
+
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("recording the imported template's managed object reference")
+		finder := vsphereFinder()
+		vm, err := finder.VirtualMachine(ctx, templatePath)
+		Expect(err).NotTo(HaveOccurred())
+		originalRef := vm.Reference()
+
+		By("reconciling a second time")
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("confirming the template was not re-imported")
+		// A re-import would destroy/replace the VM and yield a new reference;
+		// an unchanged reference proves Exists() short-circuited the upload.
+		vm, err = finder.VirtualMachine(ctx, templatePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(vm.Reference()).To(Equal(originalRef))
+
+		By("confirming the NodeImage is still Available")
+		reconciled := &imagev1alpha1.NodeImage{}
+		Expect(k8sClient.Get(ctx, namespacedName, reconciled)).To(Succeed())
+		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageAvailable))
+	})
+
+	It("marks the NodeImage as Missing when the S3 object is absent", func() {
+		namespacedName := types.NamespacedName{Name: testMissingResourceName, Namespace: "default"}
+		templatePath := testutil.VCSimFolder + "/" + testMissingImageName
+
+		By("creating the NodeImage for an unseeded image")
+		nodeImage := &imagev1alpha1.NodeImage{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testMissingResourceName,
+				Namespace: "default",
+			},
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     testMissingImageName,
+				Provider: testProvider,
+			},
+		}
+		Expect(k8sClient.Create(ctx, nodeImage)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, nodeImage)
+		})
+
+		nodeImage.Status.Releases = []string{"vsphere-1.2.3"}
+		nodeImage.Status.State = imagev1alpha1.NodeImagePending
+		Expect(k8sClient.Status().Update(ctx, nodeImage)).To(Succeed())
+
+		By("reconciling the NodeImage")
+		// The HEAD check against the fake bucket 404s, so the reconcile requeues
+		// without error rather than propagating a failure.
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("observing the NodeImage reported as Missing")
+		reconciled := &imagev1alpha1.NodeImage{}
+		Expect(k8sClient.Get(ctx, namespacedName, reconciled)).To(Succeed())
+		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageMissing))
+
+		By("confirming no template was imported into vSphere")
+		finder := vsphereFinder()
+		_, err = finder.VirtualMachine(ctx, templatePath)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("marks the NodeImage as Error when the OVA import fails", func() {
+		namespacedName := types.NamespacedName{Name: testErrorResourceName, Namespace: "default"}
+		templatePath := testutil.VCSimFolder + "/" + testErrorImageName
+
+		By("creating the NodeImage for an image seeded with garbage bytes")
+		nodeImage := &imagev1alpha1.NodeImage{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testErrorResourceName,
+				Namespace: "default",
+			},
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     testErrorImageName,
+				Provider: testProvider,
+			},
+		}
+		Expect(k8sClient.Create(ctx, nodeImage)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, nodeImage)
+		})
+
+		nodeImage.Status.Releases = []string{"vsphere-1.2.3"}
+		nodeImage.Status.State = imagev1alpha1.NodeImagePending
+		Expect(k8sClient.Status().Update(ctx, nodeImage)).To(Succeed())
+
+		By("reconciling the NodeImage")
+		// The object exists (HEAD 200) but is not a valid OVA, so the import
+		// fails and the reconcile propagates the error after setting the status.
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).To(HaveOccurred())
+
+		By("observing the NodeImage reported as Error")
+		reconciled := &imagev1alpha1.NodeImage{}
+		Expect(k8sClient.Get(ctx, namespacedName, reconciled)).To(Succeed())
+		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageError))
+
+		By("confirming no template was imported into vSphere")
+		finder := vsphereFinder()
+		_, err = finder.VirtualMachine(ctx, templatePath)
+		Expect(err).To(HaveOccurred())
+	})
 })
 
 // vsphereFinder returns a govmomi finder scoped to the simulator's datacenter,
