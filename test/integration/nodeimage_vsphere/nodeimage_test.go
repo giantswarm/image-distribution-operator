@@ -24,6 +24,7 @@ import (
 
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/vim25/mo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -67,14 +68,7 @@ var _ = Describe("NodeImage vSphere reconciliation", func() {
 		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageAvailable))
 
 		By("confirming the image was imported into vSphere as a template")
-		gclient, err := vcsim.Client(ctx)
-		Expect(err).NotTo(HaveOccurred())
-
-		finder := find.NewFinder(gclient.Client, true)
-		dc, err := finder.DatacenterOrDefault(ctx, testutil.VCSimDatacenter)
-		Expect(err).NotTo(HaveOccurred())
-		finder.SetDatacenter(dc)
-
+		finder := vsphereFinder()
 		vm, err := finder.VirtualMachine(ctx, testutil.VCSimFolder+"/"+testImageName)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -83,4 +77,65 @@ var _ = Describe("NodeImage vSphere reconciliation", func() {
 		Expect(managedVM.Config).NotTo(BeNil())
 		Expect(managedVM.Config.Template).To(BeTrue())
 	})
+
+	It("destroys the vSphere template when the NodeImage is deleted", func() {
+		namespacedName := types.NamespacedName{Name: testDeleteResourceName, Namespace: "default"}
+		templatePath := testutil.VCSimFolder + "/" + testDeleteImageName
+
+		By("creating and importing the NodeImage")
+		nodeImage := &imagev1alpha1.NodeImage{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testDeleteResourceName,
+				Namespace: "default",
+			},
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     testDeleteImageName,
+				Provider: testProvider,
+			},
+		}
+		Expect(k8sClient.Create(ctx, nodeImage)).To(Succeed())
+
+		nodeImage.Status.Releases = []string{"vsphere-1.2.3"}
+		nodeImage.Status.State = imagev1alpha1.NodeImagePending
+		Expect(k8sClient.Status().Update(ctx, nodeImage)).To(Succeed())
+
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("confirming the template exists before deletion")
+		finder := vsphereFinder()
+		_, err = finder.VirtualMachine(ctx, templatePath)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("deleting the NodeImage")
+		// The finalizer added during the create reconcile keeps the object alive
+		// (deletion timestamp set) until the deletion reconcile runs.
+		Expect(k8sClient.Delete(ctx, nodeImage)).To(Succeed())
+
+		By("reconciling the deletion")
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("confirming the template was destroyed in vSphere")
+		_, err = finder.VirtualMachine(ctx, templatePath)
+		Expect(err).To(HaveOccurred())
+
+		By("confirming the NodeImage was removed once the finalizer cleared")
+		err = k8sClient.Get(ctx, namespacedName, &imagev1alpha1.NodeImage{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
 })
+
+// vsphereFinder returns a govmomi finder scoped to the simulator's datacenter,
+// used to assert on inventory state independently of the code under test.
+func vsphereFinder() *find.Finder {
+	gclient, err := vcsim.Client(ctx)
+	Expect(err).NotTo(HaveOccurred())
+
+	finder := find.NewFinder(gclient.Client, true)
+	dc, err := finder.DatacenterOrDefault(ctx, testutil.VCSimDatacenter)
+	Expect(err).NotTo(HaveOccurred())
+	finder.SetDatacenter(dc)
+
+	return finder
+}

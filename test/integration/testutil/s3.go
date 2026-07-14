@@ -27,9 +27,10 @@ func s3VirtualHost() string {
 	return fmt.Sprintf("%s.s3.%s.amazonaws.com", S3Bucket, S3Region)
 }
 
-// FakeS3 is an in-process S3-compatible server seeded with a single object.
+// FakeS3 is an in-process S3-compatible server seeded with one or more objects.
 type FakeS3 struct {
-	server *httptest.Server
+	backend gofakes3.Backend
+	server  *httptest.Server
 }
 
 // StartFakeS3 boots gofakes3 configured for virtual-hosted-style addressing and
@@ -42,7 +43,21 @@ func StartFakeS3(objectKey string, object []byte) (*FakeS3, error) {
 	if err := backend.CreateBucket(S3Bucket); err != nil {
 		return nil, fmt.Errorf("failed to create fake bucket: %w", err)
 	}
-	if _, err := backend.PutObject(
+
+	f := &FakeS3{
+		backend: backend,
+		server:  httptest.NewServer(faker.Server()),
+	}
+	if err := f.Seed(objectKey, object); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// Seed adds another object to the bucket, letting a suite serve fixtures for
+// more than one image key from the same fake server.
+func (f *FakeS3) Seed(objectKey string, object []byte) error {
+	if _, err := f.backend.PutObject(
 		S3Bucket,
 		objectKey,
 		map[string]string{"Content-Type": "application/octet-stream"},
@@ -50,10 +65,9 @@ func StartFakeS3(objectKey string, object []byte) (*FakeS3, error) {
 		int64(len(object)),
 		nil,
 	); err != nil {
-		return nil, fmt.Errorf("failed to seed fake object %s: %w", objectKey, err)
+		return fmt.Errorf("failed to seed fake object %s: %w", objectKey, err)
 	}
-
-	return &FakeS3{server: httptest.NewServer(faker.Server())}, nil
+	return nil
 }
 
 // Close shuts down the fake server.

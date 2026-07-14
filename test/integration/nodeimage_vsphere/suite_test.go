@@ -52,6 +52,11 @@ const (
 	// testImageName is the value placed in NodeImage.Spec.Name. pkg/image derives
 	// the S3 object key (and thus the fixture we seed) from it.
 	testImageName = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-gs"
+
+	// The deletion test uses a distinct resource/image so it imports and destroys
+	// its own vcsim template, independent of the create test's inventory.
+	testDeleteResourceName = "vsphere-test-image-delete"
+	testDeleteImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-delete-gs"
 )
 
 var (
@@ -115,6 +120,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	fakeS3, err = testutil.StartFakeS3(imageKey, ova)
 	Expect(err).NotTo(HaveOccurred())
+
+	deleteImageKey := imagekey.GetImageKey(&imagev1alpha1.NodeImage{
+		Spec: imagev1alpha1.NodeImageSpec{Name: testDeleteImageName, Provider: testProvider},
+	})
+	Expect(fakeS3.Seed(deleteImageKey, ova)).To(Succeed())
 
 	// Must run before constructing the vSphere client: govmomi's soap client
 	// inherits DialContext from http.DefaultTransport at construction time.
