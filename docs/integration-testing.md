@@ -5,6 +5,7 @@ in-process fakes — no Docker daemon required:
 
 - `test/integration/nodeimage_vsphere/` — the vSphere provider.
 - `test/integration/nodeimage_proxmox/` — the Proxmox provider.
+- `test/integration/nodeimage_vcd/` — the VMware Cloud Director provider.
 
 Shared in-process infrastructure:
 
@@ -17,11 +18,16 @@ Provider simulators:
 - **fake Proxmox** — a hand-rolled in-process Proxmox REST API (`testutil/proxmox.go`);
   Proxmox has no upstream simulator, so the fake implements just the endpoints the
   provider exercises, backed by an in-memory VM inventory and task registry.
+- **fake VCD** — a hand-rolled in-process VMware Cloud Director REST API
+  (`testutil/vcd.go`); like Proxmox, VCD has no upstream simulator, so the fake
+  implements just the go-vcloud-director wire flow the provider exercises (version
+  negotiation, session-token auth, org/catalog/vApp-template queries, and the
+  multi-step OVF upload), backed by an in-memory catalog.
 
 ## What the tests cover
 
 Each spec creates a `NodeImage`, reconciles it, and asserts against the simulator's
-inventory. Both suites cover the same five scenarios:
+inventory. All three suites cover the same five scenarios:
 
 | Spec | Scenario | Expected outcome |
 |------|----------|------------------|
@@ -34,7 +40,9 @@ inventory. Both suites cover the same five scenarios:
 vSphere seeds an OVA fixture and downloads it client-side (govmomi); the Error spec
 seeds bytes that are not a valid OVA. Proxmox seeds a qcow2 fixture that the fake
 downloads and validates server-side; the Error spec seeds bytes that are not a valid
-qcow2.
+qcow2. VCD reuses the same OVA fixture and uploads it client-side (go-vcloud-director
+unpacks it and PUTs the descriptor and disk to the fake); the Error spec seeds bytes
+that are not a valid OVA, which fails the client-side unpack.
 
 ## Running
 

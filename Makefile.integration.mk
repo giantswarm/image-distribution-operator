@@ -2,8 +2,8 @@
 #
 # Stands up an in-process test environment - a real Kubernetes API server (envtest),
 # an in-process S3-compatible bucket, and in-process provider APIs (vcsim for vSphere,
-# a hand-rolled fake for Proxmox) - and runs the NodeImage controller against it.
-# No Docker daemon is required.
+# hand-rolled fakes for Proxmox and VMware Cloud Director) - and runs the NodeImage
+# controller against it. No Docker daemon is required.
 
 LOCALBIN            ?= $(shell pwd)/bin
 ENVTEST             ?= $(LOCALBIN)/setup-envtest
@@ -20,7 +20,7 @@ setup-envtest: ## Downloads the envtest control-plane binaries (kube-apiserver, 
 	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)/k8s -p path
 
 .PHONY: test-integration
-test-integration: setup-envtest ## Runs the in-process integration suites (envtest + vcsim/fake Proxmox + fake S3).
+test-integration: setup-envtest ## Runs the in-process integration suites (envtest + vcsim/fake Proxmox/fake VCD + fake S3).
 	@echo "====> $@"
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)/k8s -p path)" \
 		go test -tags=integration ./test/integration/... -v -timeout 300s
