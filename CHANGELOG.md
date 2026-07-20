@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add local integration tests for the vSphere provider.
 - Add local integration tests for the Proxmox provider.
+- Add local integration tests for the Cloud-Director provider.
 
 ## [0.13.0] - 2026-07-09
 
