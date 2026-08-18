@@ -11,6 +11,7 @@ workflows:
           name: go-build
           binary: manager
           path: ./cmd
+          test_target: test-integration
           filters:
             # Trigger job also on git tag.
             tags:
