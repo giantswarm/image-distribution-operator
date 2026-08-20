@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - fix(deps): update aws sdk
 - Run integration tests in CI.
+- Update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.107.0
 
 ## [0.13.0] - 2026-07-09
 
