@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run integration tests in CI.
 - Update module github.com/aws/aws-sdk-go-v2/service/s3 to v1.107.0
 - Update module github.com/vmware/govmomi to v0.56.0.
+- Update docker.io/golang docker tag to v1.27.
 
 ## [0.13.0] - 2026-07-09
 
