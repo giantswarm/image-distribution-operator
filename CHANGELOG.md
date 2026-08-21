@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Stop setting the deprecated `Requeue` field on `reconcile.Result`; `RequeueAfter` already implies it.
+- Bound the OVA tar copy and tighten the VCD download directory permissions to fix gosec findings.
+- Exempt the test scaffolding from gosec. The CI lint step runs gosec without the repo config.
 
 ## [0.13.0] - 2026-07-09
 
