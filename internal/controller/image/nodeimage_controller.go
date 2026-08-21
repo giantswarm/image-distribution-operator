@@ -324,7 +324,6 @@ func ImageAvailable(url string) error {
 
 func DefaultRequeue() reconcile.Result {
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: time.Minute * 5,
 	}
 }

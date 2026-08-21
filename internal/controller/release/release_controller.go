@@ -148,7 +148,6 @@ func IsDeleted(release *v1alpha1.Release) bool {
 
 func DefaultRequeue() reconcile.Result {
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: time.Minute * 5,
 	}
 }
