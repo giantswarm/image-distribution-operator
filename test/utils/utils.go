@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:gosec // test scaffolding shells out to kubectl/make with test-controlled args
 package utils
 
 import (

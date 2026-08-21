@@ -158,7 +158,7 @@ func rewriteOVA(r io.Reader, w io.Writer, hardwareVersion string) (bool, error) 
 			if err := tw.WriteHeader(hdr); err != nil {
 				return false, fmt.Errorf("write tar header: %w", err)
 			}
-			if _, err := io.Copy(tw, tr); err != nil {
+			if _, err := io.CopyN(tw, tr, hdr.Size); err != nil {
 				return false, fmt.Errorf("copy tar entry: %w", err)
 			}
 		}
@@ -171,7 +171,7 @@ func (c *Client) downloadImage(ctx context.Context, imageURL string) (string, er
 	log := log.FromContext(ctx)
 
 	// Ensure download directory exists
-	if err := os.MkdirAll(c.downloadDir, 0755); err != nil {
+	if err := os.MkdirAll(c.downloadDir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create download directory %s: %w", c.downloadDir, err)
 	}
 
