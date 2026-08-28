@@ -1,3 +1,4 @@
-CVE-2026-5160 until=2026-08-27 # github.com/yuin/goldmark@v1.4.13
-CVE-2026-56852 until=2026-08-27 # golang.org/x/text@v0.38.0
-CVE-2026-63209 until=2026-08-28 # github.com/klauspost/compress@v1.18.0
+CVE-2026-63209 until=2026-09-27 # github.com/klauspost/compress@v1.18.0
+CVE-2026-5160 until=2026-09-27 # github.com/yuin/goldmark@v1.4.13
+CVE-2026-56864 until=2026-09-27 # golang.org/x/mod@v0.38.0
+CVE-2026-56865 until=2026-09-27 # golang.org/x/mod@v0.38.0
