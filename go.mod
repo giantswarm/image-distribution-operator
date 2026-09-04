@@ -11,7 +11,7 @@ require (
 	github.com/giantswarm/releases/sdk v0.13.0
 	github.com/johannesboyne/gofakes3 v1.2.0
 	github.com/onsi/ginkgo/v2 v2.32.1
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/stretchr/testify v1.12.1
 	github.com/vmware/go-vcloud-director/v3 v3.1.1
 	github.com/vmware/govmomi v0.56.0
