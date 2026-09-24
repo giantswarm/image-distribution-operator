@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update module github.com/vmware/govmomi to v0.56.0.
 - Update docker.io/golang docker tag to v1.27.
 - Update dependency golangci/golangci-lint to v2.13.1.
+- Update architect to v10.11.0 (giantswarm/image-distribution-operator#210)
 
 ### Fixed
 
