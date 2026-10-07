@@ -2,3 +2,5 @@ CVE-2026-93450 until=2026-10-30 # github.com/go-openapi/swag/jsonutils@v0.26.0
 CVE-2026-63209 until=2026-10-30 # github.com/klauspost/compress@v1.18.0
 CVE-2026-56864 until=2026-10-30 # golang.org/x/mod@v0.38.0
 CVE-2026-56865 until=2026-10-30 # golang.org/x/mod@v0.38.0
+CVE-2026-56855 until=2026-11-06 # golang.org/x/crypto@v0.55.0
+CVE-2026-78662 until=2026-11-06 # golang.org/x/crypto@v0.55.0
