@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update docker.io/golang docker tag to v1.27.
 - Update dependency golangci/golangci-lint to v2.13.1.
 - Update architect to v10.11.0 (giantswarm/image-distribution-operator#210)
+- Update architect to v10.13.4 (giantswarm/image-distribution-operator#227)
 
 ### Fixed
 
