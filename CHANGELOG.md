@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update architect to v10.11.0 (giantswarm/image-distribution-operator#210)
 - Update architect to v10.13.4 (giantswarm/image-distribution-operator#227)
 - Update architect to v10.15.1 (giantswarm/image-distribution-operator#249)
+- Update architect to v10.16.3 (giantswarm/image-distribution-operator#251)
 
 ### Fixed
 
