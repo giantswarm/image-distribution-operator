@@ -28,6 +28,7 @@ linters:
     - unconvert
     - unparam
     - unused
+    - gosec
   settings:
     revive:
       rules:
