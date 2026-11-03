@@ -93,7 +93,8 @@ func hardwareVersionString(hardwareVersion int) string {
 // hwVersionRe matches the VirtualSystemType element in an OVF descriptor
 var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
 
-// downloadAndExtract extracts the OVA at imageURL into a new temp dir, which the caller must remove, and returns it and the OVF path.
+// downloadAndExtract extracts the OVA at imageURL into a new temp dir and returns it and the OVF path.
+// The caller must remove the dir.
 func (c *Client) downloadAndExtract(ctx context.Context, imageURL, hardwareVersion string) (string, string, error) {
 	log := log.FromContext(ctx)
 
