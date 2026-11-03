@@ -18,8 +18,10 @@ package image
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
@@ -36,7 +38,15 @@ import (
 
 const (
 	NodeImageFinalizer = "image-distribution-operator.finalizers.giantswarm.io/node-image-controller"
+
+	// maxUploadAttempts bounds how often a NodeImage is uploaded to its
+	// provider without the image being confirmed healthy afterwards.
+	maxUploadAttempts = 3
 )
+
+// errUploadAttemptsExhausted is returned by CreateProvider once
+// maxUploadAttempts uploads did not result in a healthy image.
+var errUploadAttemptsExhausted = errors.New("upload attempts exhausted")
 
 // NodeImageReconciler reconciles a NodeImage object
 type NodeImageReconciler struct {
@@ -110,6 +120,18 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
+	return r.reconcileProvider(ctx, nodeImage, url, prov)
+}
+
+// reconcileProvider makes sure the image is available in all locations of the
+// provider.
+func (r *NodeImageReconciler) reconcileProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, prov provider.Provider) (ctrl.Result, error) {
+	log := log.FromContext(ctx)
+
+	// confirmed stays true if every location already had a healthy image,
+	// i.e. nothing was uploaded in this reconcile.
+	confirmed := true
+
 	// Process image for all locations in the provider
 	for loc := range prov.GetLocations() {
 		// check if the image is available
@@ -120,10 +142,33 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 			return DefaultRequeue(), nil
 		}
-		if err := r.CreateProvider(ctx, nodeImage, url, loc, prov); err != nil {
+		uploaded, err := r.CreateProvider(ctx, nodeImage, url, loc, prov)
+		if errors.Is(err, errUploadAttemptsExhausted) {
+			log.Error(err, "Giving up on uploading node image - remove the annotation to allow new attempts",
+				"nodeImage", nodeImage.Name, "location", loc, "annotation", image.UploadAttemptsAnnotation)
+			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update status: %w", statusErr)
+			}
+			// Not returning the error: retrying with backoff would not upload
+			// again anyway. Keep checking with the default interval, so the
+			// NodeImage recovers once the image is fixed or the annotation is
+			// removed.
+			return DefaultRequeue(), nil
+		}
+		if err != nil {
 			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to create node image: %w\nfailed to update status: %w", err, statusErr)
 			}
+			return ctrl.Result{}, err
+		}
+		confirmed = confirmed && !uploaded
+	}
+
+	// Only reset the counter once the provider reports the image as healthy,
+	// not right after an upload: an upload that succeeds but leaves a broken
+	// image behind must still count towards the limit.
+	if confirmed {
+		if err := r.resetUploadAttempts(ctx, nodeImage); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -226,34 +271,105 @@ func (r *NodeImageReconciler) handleNoReleases(ctx context.Context, nodeImage *i
 	return ctrl.Result{}, true, r.Delete(ctx, nodeImage)
 }
 
-func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string, prov provider.Provider) error {
+// CreateProvider makes sure the image is available in the given location,
+// uploading it if it is missing and replacing it if the provider reports it as
+// broken. It reports whether an upload happened. Uploads are bounded by
+// maxUploadAttempts (counted in image.UploadAttemptsAnnotation); once
+// exhausted it returns an error wrapping errUploadAttemptsExhausted.
+func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string, prov provider.Provider) (bool, error) {
 	log := log.FromContext(ctx)
 
 	// check if the image is already uploaded
-	if exists, err := prov.Exists(ctx, nodeImage.Spec.Name, loc); err != nil {
-		return fmt.Errorf("failed to check if image exists: %w", err)
-	} else if exists {
+	exists, err := prov.Exists(ctx, nodeImage.Spec.Name, loc)
+	broken := errors.Is(err, provider.ErrImageBroken)
+	if err != nil && !broken {
+		return false, fmt.Errorf("failed to check if image exists: %w", err)
+	}
+	if exists {
 		// set the status
-		return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
+		return false, r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 	}
 
-	log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name, "location", loc)
+	attempts := uploadAttempts(nodeImage)
+	if attempts >= maxUploadAttempts {
+		if broken {
+			return false, fmt.Errorf("%w: image is still broken after %d uploads: %w", errUploadAttemptsExhausted, attempts, err)
+		}
+		return false, fmt.Errorf("%w: image is still missing after %d uploads", errUploadAttemptsExhausted, attempts)
+	}
+
+	if broken {
+		log.Info("Node image is broken, deleting it to upload it again", "nodeImage", nodeImage.Name, "location", loc, "reason", err.Error())
+		if err := prov.Delete(ctx, nodeImage.Spec.Name, loc); err != nil {
+			return false, fmt.Errorf("failed to delete broken image: %w", err)
+		}
+	} else {
+		log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name, "location", loc)
+	}
+
+	// Record the attempt before uploading, so that an upload that never
+	// returns (e.g. the pod gets evicted) is counted as well.
+	attempts++
+	if err := r.setUploadAttempts(ctx, nodeImage, attempts); err != nil {
+		return false, err
+	}
 
 	// set the status
 	if err := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageUploading); err != nil {
-		return err
+		return false, err
 	}
 
 	// import the image
-	err := prov.Create(ctx, url, nodeImage.Spec.Name, loc)
-	if err != nil {
-		return fmt.Errorf("failed to import image: %w", err)
+	if err := prov.Create(ctx, url, nodeImage.Spec.Name, loc); err != nil {
+		return false, fmt.Errorf("failed to import image (attempt %d/%d): %w", attempts, maxUploadAttempts, err)
 	}
 
-	log.Info("Node image uploaded and processed", "nodeImage", nodeImage.Name, "location", loc)
+	log.Info("Node image uploaded and processed", "nodeImage", nodeImage.Name, "location", loc, "attempt", attempts)
 
 	// set the status
-	return r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
+	return true, r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
+}
+
+// uploadAttempts returns the number of uploads recorded on the NodeImage. A
+// missing or invalid annotation counts as no attempts.
+func uploadAttempts(nodeImage *imagev1alpha1.NodeImage) int {
+	attempts, err := strconv.Atoi(nodeImage.Annotations[image.UploadAttemptsAnnotation])
+	if err != nil || attempts < 0 {
+		return 0
+	}
+	return attempts
+}
+
+// setUploadAttempts records the number of uploads on the NodeImage.
+//
+// Patch replaces the in-memory object with the stored one, including its
+// status. Status changes are therefore written right away (UpdateStatus) and
+// never left pending across this call.
+func (r *NodeImageReconciler) setUploadAttempts(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, attempts int) error {
+	patch := client.MergeFrom(nodeImage.DeepCopy())
+	if nodeImage.Annotations == nil {
+		nodeImage.Annotations = make(map[string]string)
+	}
+	nodeImage.Annotations[image.UploadAttemptsAnnotation] = strconv.Itoa(attempts)
+	if err := r.Patch(ctx, nodeImage, patch); err != nil {
+		return fmt.Errorf("failed to record upload attempt: %w", err)
+	}
+	return nil
+}
+
+// resetUploadAttempts removes the upload counter from the NodeImage. See
+// setUploadAttempts regarding the in-memory object.
+func (r *NodeImageReconciler) resetUploadAttempts(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) error {
+	if _, ok := nodeImage.Annotations[image.UploadAttemptsAnnotation]; !ok {
+		return nil
+	}
+	patch := client.MergeFrom(nodeImage.DeepCopy())
+	delete(nodeImage.Annotations, image.UploadAttemptsAnnotation)
+	if err := r.Patch(ctx, nodeImage, patch); err != nil {
+		return fmt.Errorf("failed to reset upload attempts: %w", err)
+	}
+	log.FromContext(ctx).Info("Node image confirmed healthy, upload attempts reset", "nodeImage", nodeImage.Name)
+	return nil
 }
 
 func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, loc string, prov provider.Provider) error {
@@ -276,6 +392,11 @@ func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *ima
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// The controller deliberately runs with the default single worker: uploads
+// run synchronously inside the reconcile, and providers rely on no upload
+// being in flight while they check an image (see the Cloud Director provider's
+// handling of unfinished vApp templates).
 func (r *NodeImageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&imagev1alpha1.NodeImage{}).

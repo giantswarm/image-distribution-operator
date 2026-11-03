@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exempt the test scaffolding from gosec. The CI lint step runs gosec without the repo config.
 - Update `golang.org/x/net` to v0.62.0 to fix known vulnerabilities found by Nancy (CVE-2026-97045, CVE-2026-78661).
 - Keep a release in the status of a `NodeImage` that was awaiting deletion. Removing the last-used annotation reset the in-memory object, so the release was dropped and the image stayed in `AwaitingDeletion`.
+- Re-upload Cloud Director vApp templates left unfinished by an interrupted upload (e.g. an evicted operator pod) instead of reporting the `NodeImage` as `Available`. Uploads are attempted at most 3 times per `NodeImage`, after which it stays in `Error`; remove the `image-distribution-operator.giantswarm.io/upload-attempts` annotation to allow new attempts.
 
 ## [0.13.0] - 2026-07-09
 

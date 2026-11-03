@@ -14,6 +14,11 @@ import (
 
 const (
 	LastUsedAnnotation = "image-distribution-operator.giantswarm.io/last-used"
+	// UploadAttemptsAnnotation counts the uploads of a NodeImage to its
+	// provider since the image was last confirmed healthy. Once the limit is
+	// reached the operator stops uploading; removing the annotation allows
+	// new attempts.
+	UploadAttemptsAnnotation = "image-distribution-operator.giantswarm.io/upload-attempts"
 )
 
 // Config is a struct that holds the configuration for the Client

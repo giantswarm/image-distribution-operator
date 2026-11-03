@@ -9,9 +9,12 @@ import (
 	"time"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
+	types "github.com/vmware/go-vcloud-director/v3/types/v56"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/giantswarm/image-distribution-operator/pkg/provider"
 )
 
 // defaultSessionRefreshThreshold is kept comfortably under Cloud Director's
@@ -161,8 +164,10 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 		return false, err
 	}
 
-	// Check if the vApp template exists in the catalog
-	_, err = catalog.GetVAppTemplateByName(name)
+	// Check if the vApp template exists in the catalog. The lookup does not
+	// filter by status, so it also finds templates left over from an
+	// interrupted upload.
+	vAppTemplate, err := catalog.GetVAppTemplateByName(name)
 	if err != nil {
 		if govcd.ContainsNotFound(err) {
 			log.Info("vApp template not found in catalog", "name", name, "catalog", c.location.Catalog)
@@ -171,8 +176,66 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 		return false, fmt.Errorf("failed to check for vApp template %s: %w", name, err)
 	}
 
-	log.Info("vApp template exists in catalog", "name", name, "catalog", c.location.Catalog)
-	return true, nil
+	status := statusName(vAppTemplate.VAppTemplate.Status)
+	switch classifyTemplateStatus(vAppTemplate.VAppTemplate.Status) {
+	case templateHealthy:
+		log.Info("vApp template exists in catalog", "name", name, "catalog", c.location.Catalog, "status", status)
+		return true, nil
+	case templateBroken:
+		log.Info("vApp template exists in catalog but is broken",
+			"name", name, "catalog", c.location.Catalog, "status", status)
+		return false, fmt.Errorf("vApp template %s has status %s: %w", name, status, provider.ErrImageBroken)
+	default:
+		return false, fmt.Errorf("vApp template %s has unexpected status %s", name, status)
+	}
+}
+
+// templateHealth is the classification of a vApp template's status.
+type templateHealth int
+
+const (
+	// templateHealthy means the upload finished and machines can be created
+	// from the template.
+	templateHealthy templateHealth = iota
+	// templateBroken means the template is a leftover of an upload that did
+	// not finish and has to be deleted and uploaded again.
+	templateBroken
+	// templateUnexpected covers every other status. They are not expected for
+	// a catalog template we uploaded, or are transient states driven by Cloud
+	// Director itself (e.g. COPYING_CONTENTS, QUARANTINED), so the template is
+	// neither used nor deleted.
+	templateUnexpected
+)
+
+// classifyTemplateStatus maps a vApp template status (see types.VAppStatuses)
+// to its health.
+//
+// The upload-in-progress states (UNRESOLVED, DESCRIPTOR_PENDING,
+// DISK_CONTENTS_PENDING) count as broken rather than "still uploading":
+// uploads run synchronously inside the NodeImage reconcile, the NodeImage
+// controller runs a single worker and leader election keeps a single active
+// replica. So whenever Exists is called, no upload of ours is in flight and a
+// template in one of these states is orphaned, typically because the operator
+// pod was evicted or lost its leader lease mid-upload.
+func classifyTemplateStatus(status int) templateHealth {
+	switch statusName(status) {
+	// govcd itself requires POWERED_OFF to create a VM from a template
+	// (addNewVMW); RESOLVED is the other settled state of a template.
+	case "RESOLVED", "POWERED_OFF":
+		return templateHealthy
+	case "FAILED_CREATION", "UNRESOLVED", "DESCRIPTOR_PENDING", "DISK_CONTENTS_PENDING", "TRANSFER_TIMEOUT":
+		return templateBroken
+	default:
+		return templateUnexpected
+	}
+}
+
+// statusName returns the Cloud Director name of a vApp template status.
+func statusName(status int) string {
+	if name, ok := types.VAppStatuses[status]; ok {
+		return name
+	}
+	return fmt.Sprintf("UNKNOWN_STATUS(%d)", status)
 }
 
 // Delete deletes an image from cloudDirector
