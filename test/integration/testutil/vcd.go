@@ -42,7 +42,19 @@ type fakeVAppTemplate struct {
 	// after it, it reports the descriptor plus the disk, which is what govcd's
 	// waitForTempUploadLinks blocks on.
 	descriptorUploaded bool
+	// status is the vApp-template status reported by the fake (see govcd's
+	// types.VAppStatuses). A new template starts as VCDStatusUnresolved and
+	// becomes VCDStatusPoweredOff once its disk has been uploaded.
+	status int
 }
+
+// vApp-template status codes, as defined by types.VAppStatuses in
+// go-vcloud-director.
+const (
+	VCDStatusFailedCreation = -1
+	VCDStatusUnresolved     = 0
+	VCDStatusPoweredOff     = 8
+)
 
 // FakeVCD is an in-process VMware Cloud Director REST API simulator. VCD has no
 // upstream simulator equivalent to govmomi's vcsim, so this hand-rolled fake
@@ -90,6 +102,17 @@ func (f *FakeVCD) FindByName(name string) (uuid string, found bool) {
 		}
 	}
 	return "", false
+}
+
+// SeedTemplate adds a vApp template with the given status to the catalog
+// without going through an upload, e.g. to simulate the leftover of an
+// interrupted upload. It returns the template's uuid.
+func (f *FakeVCD) SeedTemplate(name string, status int) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	uuid := f.newUUID()
+	f.templates[uuid] = &fakeVAppTemplate{uuid: uuid, name: name, descriptorUploaded: true, status: status}
+	return uuid
 }
 
 // WriteConfig writes the credentials and locations YAML files that
@@ -255,7 +278,7 @@ func (f *FakeVCD) handleCreateItem(w http.ResponseWriter, r *http.Request) {
 
 	f.mu.Lock()
 	uuid := f.newUUID()
-	f.templates[uuid] = &fakeVAppTemplate{uuid: uuid, name: params.Name}
+	f.templates[uuid] = &fakeVAppTemplate{uuid: uuid, name: params.Name, status: VCDStatusUnresolved}
 	f.mu.Unlock()
 
 	w.WriteHeader(http.StatusCreated)
@@ -275,8 +298,10 @@ func (f *FakeVCD) handleGetTemplate(w http.ResponseWriter, path string) {
 	t := f.templates[uuid]
 	uploaded := t != nil && t.descriptorUploaded
 	name := ""
+	status := VCDStatusUnresolved
 	if t != nil {
 		name = t.name
+		status = t.status
 	}
 	f.mu.Unlock()
 
@@ -304,10 +329,10 @@ func (f *FakeVCD) handleGetTemplate(w http.ResponseWriter, path string) {
   </Files>`, f.URL(), uuid)
 	}
 
-	_, _ = fmt.Fprintf(w, `<VAppTemplate href="%s/api/vAppTemplate/vappTemplate-%s" id="urn:vcloud:vapptemplate:%s" name="%s" status="0" ovfDescriptorUploaded="%t">
+	_, _ = fmt.Fprintf(w, `<VAppTemplate href="%s/api/vAppTemplate/vappTemplate-%s" id="urn:vcloud:vapptemplate:%s" name="%s" status="%d" ovfDescriptorUploaded="%t">
   %s
   %s
-</VAppTemplate>`, f.URL(), uuid, uuid, name, uploaded, tasks, files)
+</VAppTemplate>`, f.URL(), uuid, uuid, name, status, uploaded, tasks, files)
 }
 
 // handleDeleteTemplate removes the template and returns a delete task that polls
@@ -324,17 +349,19 @@ func (f *FakeVCD) handleDeleteTemplate(w http.ResponseWriter, path string) {
 }
 
 // handleTransferPut accepts an OVF descriptor or disk upload. The descriptor PUT
-// flips the template into its "links ready" state; disk PUTs are accepted and
-// discarded.
+// flips the template into its "links ready" state; disk PUTs are discarded and
+// resolve the template, so it reports the status of a finished upload.
 func (f *FakeVCD) handleTransferPut(w http.ResponseWriter, path string) {
-	if strings.HasSuffix(path, "/descriptor.ovf") {
-		uuid := transferUUID(path)
-		f.mu.Lock()
-		if t := f.templates[uuid]; t != nil {
+	uuid := transferUUID(path)
+	f.mu.Lock()
+	if t := f.templates[uuid]; t != nil {
+		if strings.HasSuffix(path, "/descriptor.ovf") {
 			t.descriptorUploaded = true
+		} else {
+			t.status = VCDStatusPoweredOff
 		}
-		f.mu.Unlock()
 	}
+	f.mu.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -44,6 +44,12 @@ qcow2. VCD reuses the same OVA fixture and uploads it client-side (go-vcloud-dir
 unpacks it and PUTs the descriptor and disk to the fake); the Error spec seeds bytes
 that are not a valid OVA, which fails the client-side unpack.
 
+The VCD suite additionally covers a template left behind by an interrupted upload: the
+fake catalog is seeded with a `FAILED_CREATION` template of the same name, and the
+reconcile is expected to delete it, import a fresh one and report `Available`. The
+fake reports new templates as `UNRESOLVED` until their disk is uploaded, then as
+`POWERED_OFF`, mirroring Cloud Director.
+
 ## Running
 
 ```sh

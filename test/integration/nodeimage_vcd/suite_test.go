@@ -77,6 +77,11 @@ const (
 	// Error test: seeded with garbage bytes so the OVA unpack fails.
 	testErrorResourceName = "vcd-test-image-error"
 	testErrorImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-error-gs"
+
+	// Broken test: a valid OVA is seeded, but the catalog already holds a
+	// template of that name left behind by an interrupted upload.
+	testBrokenResourceName = "vcd-test-image-broken"
+	testBrokenImageName    = "flatcar-stable-3975.2.0-kube-1.30.4-tooling-1.18.1-broken-gs"
 )
 
 var (
@@ -149,6 +154,11 @@ var _ = BeforeSuite(func() {
 		Spec: imagev1alpha1.NodeImageSpec{Name: testIdempotentImageName, Provider: testProvider},
 	})
 	Expect(fakeS3.Seed(idempotentImageKey, ova)).To(Succeed())
+
+	brokenImageKey := imagekey.GetImageKey(&imagev1alpha1.NodeImage{
+		Spec: imagev1alpha1.NodeImageSpec{Name: testBrokenImageName, Provider: testProvider},
+	})
+	Expect(fakeS3.Seed(brokenImageKey, ova)).To(Succeed())
 
 	// Seeded with bytes that are not a valid OVA so the OVF unpack fails.
 	errorImageKey := imagekey.GetImageKey(&imagev1alpha1.NodeImage{

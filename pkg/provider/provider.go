@@ -1,12 +1,19 @@
 package provider
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrImageBroken is wrapped by Exists when an image is present but unusable and must be re-uploaded.
+var ErrImageBroken = errors.New("image exists but is broken")
 
 // Provider defines the interface for image distribution providers
 type Provider interface {
 	// Exists checks if an image already exists in the provider's catalog
 	// name: the image name
 	// loc: the location identifier within the provider
+	// Returns false and ErrImageBroken if the image is present but unusable.
 	Exists(ctx context.Context, name string, loc string) (bool, error)
 
 	// Create imports and uploads an image to the provider's catalog
