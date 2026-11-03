@@ -109,6 +109,7 @@ func TestCreateOrUpdateImage(t *testing.T) {
 		expectedError    error
 		expectedCreated  bool
 		expectedReleases []string
+		expectedState    images.NodeImageState
 	}{
 		{
 			name:             "case 0: image does not exist, should be created",
@@ -147,6 +148,26 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			expectedCreated:  false,
 			expectedReleases: []string{"v1.1.0", "v1.2.0", "v1.0.0"},
 		},
+		{
+			name:    "case 4: image awaiting deletion with last used annotation, should add release and reset state",
+			release: "v1.0.0",
+			existingImage: &images.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-image",
+					Namespace: "test-namespace",
+					Annotations: map[string]string{
+						LastUsedAnnotation: time.Now().Format(time.RFC3339),
+					},
+				},
+				Status: images.NodeImageStatus{
+					Releases: []string{},
+					State:    images.NodeImageAwaitingDeletion,
+				},
+			},
+			expectedCreated:  false,
+			expectedReleases: []string{"v1.0.0"},
+			expectedState:    images.NodeImagePending,
+		},
 	}
 
 	for i, tc := range testCases {
@@ -168,10 +189,12 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			}
 
 			if tc.existingImage != nil {
+				status := tc.existingImage.Status
 				err := fakeClient.Create(ctx, tc.existingImage)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
+				tc.existingImage.Status = status
 				err = fakeClient.Status().Update(ctx, tc.existingImage)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -203,6 +226,10 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			}
 
 			assert.ElementsMatch(t, tc.expectedReleases, fetchedImage.Status.Releases)
+			if tc.expectedState != "" {
+				assert.Equal(t, tc.expectedState, fetchedImage.Status.State)
+			}
+			assert.NotContains(t, fetchedImage.Annotations, LastUsedAnnotation)
 		})
 	}
 }
