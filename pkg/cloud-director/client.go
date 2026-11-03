@@ -164,9 +164,7 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 		return false, err
 	}
 
-	// Check if the vApp template exists in the catalog. The lookup does not
-	// filter by status, so it also finds templates left over from an
-	// interrupted upload.
+	// Check if the vApp template exists in the catalog (any status)
 	vAppTemplate, err := catalog.GetVAppTemplateByName(name)
 	if err != nil {
 		if govcd.ContainsNotFound(err) {
@@ -194,33 +192,19 @@ func (c *Client) Exists(ctx context.Context, name string, loc string) (bool, err
 type templateHealth int
 
 const (
-	// templateHealthy means the upload finished and machines can be created
-	// from the template.
+	// templateHealthy means machines can be created from the template.
 	templateHealthy templateHealth = iota
-	// templateBroken means the template is a leftover of an upload that did
-	// not finish and has to be deleted and uploaded again.
+	// templateBroken means an unfinished upload that must be deleted and redone.
 	templateBroken
-	// templateUnexpected covers every other status. They are not expected for
-	// a catalog template we uploaded, or are transient states driven by Cloud
-	// Director itself (e.g. COPYING_CONTENTS, QUARANTINED), so the template is
-	// neither used nor deleted.
+	// templateUnexpected covers every other status; the template is neither used nor deleted.
 	templateUnexpected
 )
 
-// classifyTemplateStatus maps a vApp template status (see types.VAppStatuses)
-// to its health.
-//
-// The upload-in-progress states (UNRESOLVED, DESCRIPTOR_PENDING,
-// DISK_CONTENTS_PENDING) count as broken rather than "still uploading":
-// uploads run synchronously inside the NodeImage reconcile, the NodeImage
-// controller runs a single worker and leader election keeps a single active
-// replica. So whenever Exists is called, no upload of ours is in flight and a
-// template in one of these states is orphaned, typically because the operator
-// pod was evicted or lost its leader lease mid-upload.
+// classifyTemplateStatus maps a vApp template status to its health. Upload-in-progress
+// states count as broken: uploads run synchronously in the single-worker reconcile,
+// so none of ours is in flight when Exists is called.
 func classifyTemplateStatus(status int) templateHealth {
 	switch statusName(status) {
-	// govcd itself requires POWERED_OFF to create a VM from a template
-	// (addNewVMW); RESOLVED is the other settled state of a template.
 	case "RESOLVED", "POWERED_OFF":
 		return templateHealthy
 	case "FAILED_CREATION", "UNRESOLVED", "DESCRIPTOR_PENDING", "DISK_CONTENTS_PENDING", "TRANSFER_TIMEOUT":

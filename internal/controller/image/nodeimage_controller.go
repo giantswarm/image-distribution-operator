@@ -39,13 +39,11 @@ import (
 const (
 	NodeImageFinalizer = "image-distribution-operator.finalizers.giantswarm.io/node-image-controller"
 
-	// maxUploadAttempts bounds how often a NodeImage is uploaded to its
-	// provider without the image being confirmed healthy afterwards.
+	// maxUploadAttempts bounds uploads that did not result in a healthy image.
 	maxUploadAttempts = 3
 )
 
-// errUploadAttemptsExhausted is returned by CreateProvider once
-// maxUploadAttempts uploads did not result in a healthy image.
+// errUploadAttemptsExhausted is returned by CreateProvider once maxUploadAttempts is reached.
 var errUploadAttemptsExhausted = errors.New("upload attempts exhausted")
 
 // NodeImageReconciler reconciles a NodeImage object
@@ -123,13 +121,11 @@ func (r *NodeImageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return r.reconcileProvider(ctx, nodeImage, url, prov)
 }
 
-// reconcileProvider makes sure the image is available in all locations of the
-// provider.
+// reconcileProvider makes sure the image is available in all provider locations.
 func (r *NodeImageReconciler) reconcileProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, prov provider.Provider) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// confirmed stays true if every location already had a healthy image,
-	// i.e. nothing was uploaded in this reconcile.
+	// confirmed stays true if nothing was uploaded in this reconcile
 	confirmed := true
 
 	// Process image for all locations in the provider
@@ -149,10 +145,7 @@ func (r *NodeImageReconciler) reconcileProvider(ctx context.Context, nodeImage *
 			if statusErr := r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageError); statusErr != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to update status: %w", statusErr)
 			}
-			// Not returning the error: retrying with backoff would not upload
-			// again anyway. Keep checking with the default interval, so the
-			// NodeImage recovers once the image is fixed or the annotation is
-			// removed.
+			// Keep checking, so the NodeImage recovers once the image is fixed or the annotation removed
 			return DefaultRequeue(), nil
 		}
 		if err != nil {
@@ -164,9 +157,7 @@ func (r *NodeImageReconciler) reconcileProvider(ctx context.Context, nodeImage *
 		confirmed = confirmed && !uploaded
 	}
 
-	// Only reset the counter once the provider reports the image as healthy,
-	// not right after an upload: an upload that succeeds but leaves a broken
-	// image behind must still count towards the limit.
+	// Reset only once the provider reports the image healthy, not right after an upload
 	if confirmed {
 		if err := r.resetUploadAttempts(ctx, nodeImage); err != nil {
 			return ctrl.Result{}, err
@@ -271,11 +262,7 @@ func (r *NodeImageReconciler) handleNoReleases(ctx context.Context, nodeImage *i
 	return ctrl.Result{}, true, r.Delete(ctx, nodeImage)
 }
 
-// CreateProvider makes sure the image is available in the given location,
-// uploading it if it is missing and replacing it if the provider reports it as
-// broken. It reports whether an upload happened. Uploads are bounded by
-// maxUploadAttempts (counted in image.UploadAttemptsAnnotation); once
-// exhausted it returns an error wrapping errUploadAttemptsExhausted.
+// CreateProvider uploads a missing image or replaces a broken one, and reports whether it uploaded.
 func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, url string, loc string, prov provider.Provider) (bool, error) {
 	log := log.FromContext(ctx)
 
@@ -307,8 +294,7 @@ func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *ima
 		log.Info("Node image not found, uploading", "nodeImage", nodeImage.Name, "location", loc)
 	}
 
-	// Record the attempt before uploading, so that an upload that never
-	// returns (e.g. the pod gets evicted) is counted as well.
+	// Record the attempt before uploading, so an interrupted upload counts too
 	attempts++
 	if err := r.setUploadAttempts(ctx, nodeImage, attempts); err != nil {
 		return false, err
@@ -330,8 +316,7 @@ func (r *NodeImageReconciler) CreateProvider(ctx context.Context, nodeImage *ima
 	return true, r.UpdateStatus(ctx, nodeImage, imagev1alpha1.NodeImageAvailable)
 }
 
-// uploadAttempts returns the number of uploads recorded on the NodeImage. A
-// missing or invalid annotation counts as no attempts.
+// uploadAttempts returns the recorded uploads; a missing or invalid annotation counts as 0.
 func uploadAttempts(nodeImage *imagev1alpha1.NodeImage) int {
 	attempts, err := strconv.Atoi(nodeImage.Annotations[image.UploadAttemptsAnnotation])
 	if err != nil || attempts < 0 {
@@ -340,11 +325,7 @@ func uploadAttempts(nodeImage *imagev1alpha1.NodeImage) int {
 	return attempts
 }
 
-// setUploadAttempts records the number of uploads on the NodeImage.
-//
-// Patch replaces the in-memory object with the stored one, including its
-// status. Status changes are therefore written right away (UpdateStatus) and
-// never left pending across this call.
+// setUploadAttempts records the uploads. Patch overwrites the in-memory status, so status changes must not be pending.
 func (r *NodeImageReconciler) setUploadAttempts(ctx context.Context, nodeImage *imagev1alpha1.NodeImage, attempts int) error {
 	patch := client.MergeFrom(nodeImage.DeepCopy())
 	if nodeImage.Annotations == nil {
@@ -357,8 +338,7 @@ func (r *NodeImageReconciler) setUploadAttempts(ctx context.Context, nodeImage *
 	return nil
 }
 
-// resetUploadAttempts removes the upload counter from the NodeImage. See
-// setUploadAttempts regarding the in-memory object.
+// resetUploadAttempts removes the upload counter.
 func (r *NodeImageReconciler) resetUploadAttempts(ctx context.Context, nodeImage *imagev1alpha1.NodeImage) error {
 	if _, ok := nodeImage.Annotations[image.UploadAttemptsAnnotation]; !ok {
 		return nil
@@ -392,11 +372,7 @@ func (r *NodeImageReconciler) DeleteProvider(ctx context.Context, nodeImage *ima
 }
 
 // SetupWithManager sets up the controller with the Manager.
-//
-// The controller deliberately runs with the default single worker: uploads
-// run synchronously inside the reconcile, and providers rely on no upload
-// being in flight while they check an image (see the Cloud Director provider's
-// handling of unfinished vApp templates).
+// It must keep the default single worker: providers rely on no upload being in flight in Exists.
 func (r *NodeImageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&imagev1alpha1.NodeImage{}).
