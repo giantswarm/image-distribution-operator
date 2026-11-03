@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bound the OVA tar copy and tighten the VCD download directory permissions to fix gosec findings.
 - Update `google.golang.org/grpc` to v1.83.2 and `go.opentelemetry.io/otel` to v1.45.0 to fix known vulnerabilities found by Nancy. Remove the expired entries from `.nancy-ignore`.
 - Exempt the test scaffolding from gosec. The CI lint step runs gosec without the repo config.
+- Keep a release in the status of a `NodeImage` that was awaiting deletion. Removing the last-used annotation reset the in-memory object, so the release was dropped and the image stayed in `AwaitingDeletion`.
 
 ## [0.13.0] - 2026-07-09
 

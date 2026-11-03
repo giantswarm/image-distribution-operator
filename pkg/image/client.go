@@ -155,23 +155,23 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 			return nil
 		}
 	}
-	// Add release to the list
-	object.Status.Releases = append(object.Status.Releases, i.Release)
-
 	// If the State is empty or AwaitingDeletion, set it to Pending and remove last used annotation
-	if object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion {
-		object.Status.State = images.NodeImagePending
+	resetState := object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion
+	if resetState {
 		// Remove last used annotation if it exists
-		if object.Annotations != nil {
-			if _, exists := object.Annotations[LastUsedAnnotation]; exists {
-				delete(object.Annotations, LastUsedAnnotation)
-				// Update metadata first to clear annotation
-				if err := i.Update(ctx, object); err != nil {
-					return err
-				}
+		if _, exists := object.Annotations[LastUsedAnnotation]; exists {
+			delete(object.Annotations, LastUsedAnnotation)
+			// Update metadata first to clear annotation. Update overwrites object with
+			// the stored version, so the status changes below must be applied afterwards.
+			if err := i.Update(ctx, object); err != nil {
+				return err
 			}
 		}
+		object.Status.State = images.NodeImagePending
 	}
+
+	// Add release to the list
+	object.Status.Releases = append(object.Status.Releases, i.Release)
 
 	log.Info("Adding release to the status of node image", "nodeImage", object.Name, "release", i.Release)
 	return i.Status().Update(ctx, object)
