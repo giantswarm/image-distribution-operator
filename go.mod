@@ -17,7 +17,7 @@ require (
 	github.com/vmware/govmomi v0.56.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.37.2
-	k8s.io/client-go v0.37.2
+	k8s.io/client-go v1.5.2
 	sigs.k8s.io/controller-runtime v0.25.2
 )
 
