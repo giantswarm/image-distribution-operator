@@ -9,8 +9,7 @@ controllerManager:
       - "--leader-elect"
       - "--metrics-bind-address=:8443"
       - "--health-probe-bind-address=:8081"
-    # ephemeral-storage covers the image-storage emptyDir mounted at /tmp, where
-    # the Cloud Director provider extracts one node image (~1.7 GiB) per upload.
+    # ephemeral-storage fits one extracted node image (~1.7 GiB) in /tmp.
     resources:
       limits:
         cpu: 500m

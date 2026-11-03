@@ -17,13 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// maxOVFSize bounds the size of the OVF descriptor, which is read into memory
-// to be patched. Real descriptors are a few KiB.
+// maxOVFSize bounds the OVF descriptor, which is read into memory to be patched.
 const maxOVFSize = 16 * 1024 * 1024
 
-// xmlDeclaration is prepended to OVF descriptors that lack one. govcd sniffs
-// the content type of the file passed to UploadOvf and only treats it as an
-// OVF descriptor (instead of an OVA to unpack) if it is detected as text/xml.
+// xmlDeclaration is added to OVFs lacking one, as govcd only treats text/xml files as OVF.
 const xmlDeclaration = `<?xml version="1.0" encoding="UTF-8"?>` + "\n"
 
 // ImporterConfig holds the configuration for the OVF importer
@@ -39,12 +36,7 @@ func (c *Client) importImage(ctx context.Context, config ImporterConfig) error {
 	return c.pushImport(ctx, config)
 }
 
-// pushImport uses push-based upload (operator downloads then uploads).
-//
-// The OVA is streamed from the image URL and extracted on the fly into a
-// temporary directory, so only one copy of the image is ever on disk. The
-// extracted OVF descriptor is passed to govcd, which then uploads the files it
-// references from the same directory without unpacking anything itself.
+// pushImport extracts the OVA while downloading and uploads the extracted OVF, keeping one copy on disk.
 func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	log := log.FromContext(ctx)
 
@@ -52,8 +44,7 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to download image: %w", err)
 	}
-	// Cleanup after upload. govcd uploads the files in a background goroutine,
-	// which has finished once the import task has completed.
+	// Cleanup after upload
 	defer func() {
 		if removeErr := os.RemoveAll(dir); removeErr != nil {
 			log.Info("Failed to cleanup temp directory", "path", dir, "error", removeErr)
@@ -91,8 +82,7 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	return nil
 }
 
-// hardwareVersionString converts a numeric hardware version to the OVF
-// VirtualSystemType value (e.g. 19 → "vmx-19"). 0 yields "" (no patching).
+// hardwareVersionString returns e.g. "vmx-19" for 19, or "" (no patching) for 0.
 func hardwareVersionString(hardwareVersion int) string {
 	if hardwareVersion == 0 {
 		return ""
@@ -103,11 +93,7 @@ func hardwareVersionString(hardwareVersion int) string {
 // hwVersionRe matches the VirtualSystemType element in an OVF descriptor
 var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
 
-// downloadAndExtract streams the OVA at imageURL into a new temporary
-// directory below the download directory, patching the OVF descriptor to the
-// given hardware version ("" means no patching). It returns the directory,
-// which the caller must remove, and the path of the extracted OVF descriptor.
-// On error nothing is left behind.
+// downloadAndExtract extracts the OVA at imageURL into a new temp dir, which the caller must remove, and returns it and the OVF path.
 func (c *Client) downloadAndExtract(ctx context.Context, imageURL, hardwareVersion string) (string, string, error) {
 	log := log.FromContext(ctx)
 
@@ -149,11 +135,7 @@ func (c *Client) downloadAndExtract(ctx context.Context, imageURL, hardwareVersi
 	return dir, ovfPath, nil
 }
 
-// extractOVA extracts the OVA tar stream r into dir, which must exist. The OVF
-// descriptor is patched to the given hardware version ("" means no patching)
-// and normalised so govcd recognises it as XML. All other entries are written
-// unchanged. Entries that would escape dir, links and other special files are
-// rejected. Returns the path of the extracted OVF descriptor.
+// extractOVA extracts the OVA tar stream r into dir, patching the OVF, and returns the OVF path.
 func extractOVA(r io.Reader, dir, hardwareVersion string) (string, error) {
 	tr := tar.NewReader(r)
 	ovfPath := ""
@@ -218,8 +200,7 @@ func extractOVA(r io.Reader, dir, hardwareVersion string) (string, error) {
 	return ovfPath, nil
 }
 
-// patchOVF sets the VirtualSystemType to the given hardware version ("" means
-// no patching) and makes sure the descriptor is sniffed as XML by govcd.
+// patchOVF sets the hardware version ("" means no patching) and ensures an XML declaration.
 func patchOVF(data []byte, hardwareVersion string) []byte {
 	if hardwareVersion != "" {
 		replacement := []byte("<vssd:VirtualSystemType>" + hardwareVersion + "</vssd:VirtualSystemType>")
@@ -233,8 +214,7 @@ func patchOVF(data []byte, hardwareVersion string) []byte {
 	return data
 }
 
-// writeFile creates a new file at path and copies exactly size bytes from r
-// into it. Fails if the file already exists or r ends early.
+// writeFile creates a new file at path with exactly size bytes from r.
 func writeFile(path string, r io.Reader, size int64) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600) // #nosec G304 - inside extraction dir
 	if err != nil {
