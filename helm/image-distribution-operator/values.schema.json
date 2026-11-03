@@ -86,6 +86,9 @@
                                         "cpu": {
                                             "type": "string"
                                         },
+                                        "ephemeral-storage": {
+                                            "type": "string"
+                                        },
                                         "memory": {
                                             "type": "string"
                                         }
@@ -95,6 +98,9 @@
                                     "type": "object",
                                     "properties": {
                                         "cpu": {
+                                            "type": "string"
+                                        },
+                                        "ephemeral-storage": {
                                             "type": "string"
                                         },
                                         "memory": {
@@ -125,6 +131,14 @@
                                     "type": "boolean"
                                 }
                             }
+                        }
+                    }
+                },
+                "imageStorage": {
+                    "type": "object",
+                    "properties": {
+                        "sizeLimit": {
+                            "type": "string"
                         }
                     }
                 },

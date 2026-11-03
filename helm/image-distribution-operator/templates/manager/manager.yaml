@@ -128,7 +128,12 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.controllerManager.terminationGracePeriodSeconds }}
       volumes:
         - name: image-storage
+          {{- if and .Values.controllerManager.imageStorage .Values.controllerManager.imageStorage.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ .Values.controllerManager.imageStorage.sizeLimit }}
+          {{- else }}
           emptyDir: {}
+          {{- end }}
         {{- if and .Values.vsphere.credentials .Values.vsphere.enabled }}
         - name: vsphere-credentials
           secret:

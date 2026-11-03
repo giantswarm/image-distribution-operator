@@ -9,13 +9,17 @@ controllerManager:
       - "--leader-elect"
       - "--metrics-bind-address=:8443"
       - "--health-probe-bind-address=:8081"
+    # ephemeral-storage covers the image-storage emptyDir mounted at /tmp, where
+    # the Cloud Director provider extracts one node image (~1.7 GiB) per upload.
     resources:
       limits:
         cpu: 500m
         memory: 128Mi
+        ephemeral-storage: 4Gi
       requests:
         cpu: 10m
         memory: 64Mi
+        ephemeral-storage: 2Gi
     livenessProbe:
       initialDelaySeconds: 15
       periodSeconds: 20
@@ -39,6 +43,9 @@ controllerManager:
     seccompProfile:
       type: RuntimeDefault
   terminationGracePeriodSeconds: 10
+  # Size limit of the image-storage emptyDir mounted at /tmp.
+  imageStorage:
+    sizeLimit: 4Gi
   serviceAccountName: image-distribution-operator-controller-manager
 
 # [RBAC]: To enable RBAC (Permissions) configurations

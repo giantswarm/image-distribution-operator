@@ -2,17 +2,29 @@ package clouddirector
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/vmware/go-vcloud-director/v3/govcd"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// maxOVFSize bounds the size of the OVF descriptor, which is read into memory
+// to be patched. Real descriptors are a few KiB.
+const maxOVFSize = 16 * 1024 * 1024
+
+// xmlDeclaration is prepended to OVF descriptors that lack one. govcd sniffs
+// the content type of the file passed to UploadOvf and only treats it as an
+// OVF descriptor (instead of an OVA to unpack) if it is detected as text/xml.
+const xmlDeclaration = `<?xml version="1.0" encoding="UTF-8"?>` + "\n"
 
 // ImporterConfig holds the configuration for the OVF importer
 type ImporterConfig struct {
@@ -27,42 +39,32 @@ func (c *Client) importImage(ctx context.Context, config ImporterConfig) error {
 	return c.pushImport(ctx, config)
 }
 
-// pushImport uses push-based upload (operator downloads then uploads)
+// pushImport uses push-based upload (operator downloads then uploads).
+//
+// The OVA is streamed from the image URL and extracted on the fly into a
+// temporary directory, so only one copy of the image is ever on disk. The
+// extracted OVF descriptor is passed to govcd, which then uploads the files it
+// references from the same directory without unpacking anything itself.
 func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	log := log.FromContext(ctx)
 
-	// Download the OVA file to local filesystem
-	localPath, err := c.downloadImage(ctx, config.Path)
+	dir, ovfPath, err := c.downloadAndExtract(ctx, config.Path, hardwareVersionString(config.HardwareVersion))
 	if err != nil {
 		return fmt.Errorf("failed to download image: %w", err)
 	}
+	// Cleanup after upload. govcd uploads the files in a background goroutine,
+	// which has finished once the import task has completed.
 	defer func() {
-		if removeErr := os.Remove(localPath); removeErr != nil {
-			log.Info("Failed to cleanup temp file", "path", localPath, "error", removeErr)
+		if removeErr := os.RemoveAll(dir); removeErr != nil {
+			log.Info("Failed to cleanup temp directory", "path", dir, "error", removeErr)
 		}
-	}() // Cleanup after upload
+	}()
 
-	// Patch the OVF descriptor in the OVA if a hardware version is configured
-	if config.HardwareVersion != 0 {
-		patchedPath, err := patchOVAHardwareVersion(localPath, c.downloadDir, fmt.Sprintf("vmx-%d", config.HardwareVersion))
-		if err != nil {
-			return fmt.Errorf("failed to patch OVA hardware version: %w", err)
-		}
-		if patchedPath != localPath {
-			defer func() {
-				if removeErr := os.Remove(patchedPath); removeErr != nil {
-					log.Info("Failed to cleanup patched OVA", "path", patchedPath, "error", removeErr)
-				}
-			}()
-			localPath = patchedPath
-		}
-	}
-
-	log.Info("Starting upload to cloud director", "localPath", localPath)
+	log.Info("Starting upload to cloud director", "ovfPath", ovfPath)
 
 	// Upload to cloud director
 	uploadTask, err := config.Catalog.UploadOvf(
-		localPath,   // ovaFileName - local file path
+		ovfPath,     // ovaFileName - path to the extracted OVF descriptor
 		config.Name, // itemName
 		fmt.Sprintf("Node image %s", config.Name), // description
 		1024*1024*10, // uploadPieceSize - 10MB chunks
@@ -89,121 +91,163 @@ func (c *Client) pushImport(ctx context.Context, config ImporterConfig) error {
 	return nil
 }
 
+// hardwareVersionString converts a numeric hardware version to the OVF
+// VirtualSystemType value (e.g. 19 → "vmx-19"). 0 yields "" (no patching).
+func hardwareVersionString(hardwareVersion int) string {
+	if hardwareVersion == 0 {
+		return ""
+	}
+	return fmt.Sprintf("vmx-%d", hardwareVersion)
+}
+
 // hwVersionRe matches the VirtualSystemType element in an OVF descriptor
 var hwVersionRe = regexp.MustCompile(`(?i)<vssd:VirtualSystemType>[^<]*</vssd:VirtualSystemType>`)
 
-// patchOVAHardwareVersion rewrites the OVF descriptor inside the OVA tarball,
-// replacing the VirtualSystemType with the given hardware version. Returns the
-// path to the patched OVA (a new temp file) or the original path unchanged if
-// no OVF was found.
-func patchOVAHardwareVersion(ovaPath, dir, hardwareVersion string) (string, error) {
-	in, err := os.Open(ovaPath) // #nosec G304
-	if err != nil {
-		return "", fmt.Errorf("open OVA: %w", err)
-	}
-	defer func() { _ = in.Close() }()
+// downloadAndExtract streams the OVA at imageURL into a new temporary
+// directory below the download directory, patching the OVF descriptor to the
+// given hardware version ("" means no patching). It returns the directory,
+// which the caller must remove, and the path of the extracted OVF descriptor.
+// On error nothing is left behind.
+func (c *Client) downloadAndExtract(ctx context.Context, imageURL, hardwareVersion string) (string, string, error) {
+	log := log.FromContext(ctx)
 
-	out, err := os.CreateTemp(dir, "vcd-patched-*.ova")
-	if err != nil {
-		return "", fmt.Errorf("create temp file: %w", err)
+	// Ensure download directory exists
+	if err := os.MkdirAll(c.downloadDir, 0750); err != nil {
+		return "", "", fmt.Errorf("failed to create download directory %s: %w", c.downloadDir, err)
 	}
-	outPath := out.Name()
 
-	patched, err := rewriteOVA(in, out, hardwareVersion)
-	_ = out.Close()
+	dir, err := os.MkdirTemp(c.downloadDir, "vcd-image-*")
 	if err != nil {
-		_ = os.Remove(outPath)
-		return "", err
+		return "", "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	if !patched {
-		_ = os.Remove(outPath)
-		return ovaPath, nil // nothing to patch, use original
+
+	ovfPath, err := func() (string, error) {
+		log.Info("Downloading and extracting image", "url", imageURL, "dest", dir)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("failed to download: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("download failed with status: %d", resp.StatusCode)
+		}
+
+		return extractOVA(resp.Body, dir, hardwareVersion)
+	}()
+	if err != nil {
+		_ = os.RemoveAll(dir)
+		return "", "", err
 	}
-	return outPath, nil
+
+	log.Info("Downloaded and extracted image", "dir", dir, "ovfPath", ovfPath)
+	return dir, ovfPath, nil
 }
 
-// rewriteOVA copies the tar from r to w, patching any .ovf entry it finds.
-// Returns true if an OVF entry was found and patched.
-func rewriteOVA(r io.Reader, w io.Writer, hardwareVersion string) (bool, error) {
+// extractOVA extracts the OVA tar stream r into dir, which must exist. The OVF
+// descriptor is patched to the given hardware version ("" means no patching)
+// and normalised so govcd recognises it as XML. All other entries are written
+// unchanged. Entries that would escape dir, links and other special files are
+// rejected. Returns the path of the extracted OVF descriptor.
+func extractOVA(r io.Reader, dir, hardwareVersion string) (string, error) {
 	tr := tar.NewReader(r)
-	tw := tar.NewWriter(w)
-	defer func() { _ = tw.Close() }()
-
-	replacement := []byte("<vssd:VirtualSystemType>" + hardwareVersion + "</vssd:VirtualSystemType>")
-	patched := false
+	ovfPath := ""
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return false, fmt.Errorf("read OVA tar: %w", err)
+			return "", fmt.Errorf("read OVA tar: %w", err)
+		}
+
+		if !filepath.IsLocal(hdr.Name) {
+			return "", fmt.Errorf("invalid path %q in OVA", hdr.Name)
+		}
+		target := filepath.Join(dir, hdr.Name) // #nosec G305 - validated with filepath.IsLocal above
+
+		switch hdr.Typeflag {
+		case tar.TypeXGlobalHeader:
+			continue
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0750); err != nil {
+				return "", fmt.Errorf("create directory %s: %w", hdr.Name, err)
+			}
+			continue
+		case tar.TypeReg:
+		default:
+			return "", fmt.Errorf("unsupported entry %q of type %q in OVA", hdr.Name, hdr.Typeflag)
+		}
+
+		if err := os.MkdirAll(filepath.Dir(target), 0750); err != nil {
+			return "", fmt.Errorf("create directory for %s: %w", hdr.Name, err)
 		}
 
 		if strings.HasSuffix(strings.ToLower(hdr.Name), ".ovf") {
-			data, err := io.ReadAll(tr)
+			if ovfPath != "" {
+				return "", fmt.Errorf("OVA contains more than one OVF descriptor")
+			}
+			if hdr.Size > maxOVFSize {
+				return "", fmt.Errorf("OVF descriptor %s is too large: %d bytes", hdr.Name, hdr.Size)
+			}
+			data, err := io.ReadAll(io.LimitReader(tr, hdr.Size))
 			if err != nil {
-				return false, fmt.Errorf("read OVF entry: %w", err)
+				return "", fmt.Errorf("read OVF entry: %w", err)
 			}
-			patchedData := hwVersionRe.ReplaceAll(data, replacement)
-			hdr.Size = int64(len(patchedData))
-			if err := tw.WriteHeader(hdr); err != nil {
-				return false, fmt.Errorf("write OVF header: %w", err)
+			patched := patchOVF(data, hardwareVersion)
+			if err := writeFile(target, bytes.NewReader(patched), int64(len(patched))); err != nil {
+				return "", err
 			}
-			if _, err := tw.Write(patchedData); err != nil {
-				return false, fmt.Errorf("write OVF data: %w", err)
-			}
-			patched = true
-		} else {
-			if err := tw.WriteHeader(hdr); err != nil {
-				return false, fmt.Errorf("write tar header: %w", err)
-			}
-			if _, err := io.CopyN(tw, tr, hdr.Size); err != nil {
-				return false, fmt.Errorf("copy tar entry: %w", err)
-			}
+			ovfPath = target
+			continue
+		}
+
+		if err := writeFile(target, tr, hdr.Size); err != nil {
+			return "", err
 		}
 	}
-	return patched, nil
+
+	if ovfPath == "" {
+		return "", errors.New("OVA does not contain an OVF descriptor")
+	}
+	return ovfPath, nil
 }
 
-// downloadImage downloads OVA from S3 to local temp file
-func (c *Client) downloadImage(ctx context.Context, imageURL string) (string, error) {
-	log := log.FromContext(ctx)
-
-	// Ensure download directory exists
-	if err := os.MkdirAll(c.downloadDir, 0750); err != nil {
-		return "", fmt.Errorf("failed to create download directory %s: %w", c.downloadDir, err)
+// patchOVF sets the VirtualSystemType to the given hardware version ("" means
+// no patching) and makes sure the descriptor is sniffed as XML by govcd.
+func patchOVF(data []byte, hardwareVersion string) []byte {
+	if hardwareVersion != "" {
+		replacement := []byte("<vssd:VirtualSystemType>" + hardwareVersion + "</vssd:VirtualSystemType>")
+		data = hwVersionRe.ReplaceAll(data, replacement)
 	}
 
-	// Create temp file in the configured download directory
-	tmpFile, err := os.CreateTemp(c.downloadDir, "vcd-image-*.ova")
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+	if !bytes.HasPrefix(bytes.TrimLeft(data, "\t\n\x0c\r "), []byte("<?xml")) {
+		data = append([]byte(xmlDeclaration), data...)
+	}
+	return data
+}
+
+// writeFile creates a new file at path and copies exactly size bytes from r
+// into it. Fails if the file already exists or r ends early.
+func writeFile(path string, r io.Reader, size int64) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600) // #nosec G304 - inside extraction dir
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
+		return fmt.Errorf("create file: %w", err)
 	}
-	defer func() { _ = tmpFile.Close() }()
 
-	// Download from URL
-	log.Info("Downloading image", "url", imageURL, "dest", tmpFile.Name())
-
-	resp, err := http.Get(imageURL) // #nosec G107 - URL is from trusted source (Release CR)
+	_, err = io.CopyN(f, r, size)
+	closeErr := f.Close()
 	if err != nil {
-		_ = os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("failed to download: %w", err)
+		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		_ = os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("download failed with status: %d", resp.StatusCode)
+	if closeErr != nil {
+		return fmt.Errorf("close %s: %w", filepath.Base(path), closeErr)
 	}
-
-	// Copy to file
-	written, err := io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		_ = os.Remove(tmpFile.Name())
-		return "", fmt.Errorf("failed to write file: %w", err)
-	}
-
-	log.Info("Downloaded image", "bytes", written, "path", tmpFile.Name())
-	return tmpFile.Name(), nil
+	return nil
 }
