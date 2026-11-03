@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep a release in the status of a `NodeImage` that was awaiting deletion. Removing the last-used annotation reset the in-memory object, so the release was dropped and the image stayed in `AwaitingDeletion`.
 - Keep only one copy of a node image on disk during a Cloud Director upload. The OVA is now extracted while downloading and the OVF is patched on the fly, instead of storing the OVA, a patched OVA and an unpacked copy, which got the pod evicted for ephemeral storage.
 - Set ephemeral-storage requests and limits on the manager container and a size limit on the `/tmp` emptyDir.
+- Re-upload Cloud Director vApp templates left unfinished by an interrupted upload (e.g. an evicted operator pod) instead of reporting the `NodeImage` as `Available`. Uploads are attempted at most 3 times per `NodeImage`, after which it stays in `Error`; remove the `image-distribution-operator.giantswarm.io/upload-attempts` annotation to allow new attempts.
 
 ## [0.13.0] - 2026-07-09
 

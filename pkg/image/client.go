@@ -14,6 +14,8 @@ import (
 
 const (
 	LastUsedAnnotation = "image-distribution-operator.giantswarm.io/last-used"
+	// UploadAttemptsAnnotation counts uploads since the image was last healthy; remove it to allow new attempts.
+	UploadAttemptsAnnotation = "image-distribution-operator.giantswarm.io/upload-attempts"
 )
 
 // Config is a struct that holds the configuration for the Client

@@ -28,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	imagev1alpha1 "github.com/giantswarm/image-distribution-operator/api/image/v1alpha1"
+	imagekey "github.com/giantswarm/image-distribution-operator/pkg/image"
+	"github.com/giantswarm/image-distribution-operator/test/integration/testutil"
 )
 
 var _ = Describe("NodeImage VCD reconciliation", func() {
@@ -238,5 +240,60 @@ var _ = Describe("NodeImage VCD reconciliation", func() {
 		By("confirming no template was imported into VCD")
 		_, found := fakeVCD.FindByName(testErrorImageName)
 		Expect(found).To(BeFalse())
+	})
+
+	It("replaces a template left behind by an interrupted upload", func() {
+		namespacedName := types.NamespacedName{Name: testBrokenResourceName, Namespace: "default"}
+
+		By("seeding a template that failed to be created")
+		brokenUUID := fakeVCD.SeedTemplate(testBrokenImageName, testutil.VCDStatusFailedCreation)
+
+		By("creating the NodeImage resource")
+		nodeImage := &imagev1alpha1.NodeImage{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testBrokenResourceName,
+				Namespace: "default",
+			},
+			Spec: imagev1alpha1.NodeImageSpec{
+				Name:     testBrokenImageName,
+				Provider: testProvider,
+			},
+		}
+		Expect(k8sClient.Create(ctx, nodeImage)).To(Succeed())
+		DeferCleanup(func() {
+			_ = k8sClient.Delete(ctx, nodeImage)
+		})
+
+		nodeImage.Status.Releases = []string{"cloud-director-1.2.3"}
+		nodeImage.Status.State = imagev1alpha1.NodeImagePending
+		Expect(k8sClient.Status().Update(ctx, nodeImage)).To(Succeed())
+
+		By("reconciling the NodeImage")
+		_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("confirming the broken template was replaced by a new import")
+		uuid, found := fakeVCD.FindByName(testBrokenImageName)
+		Expect(found).To(BeTrue())
+		Expect(uuid).NotTo(Equal(brokenUUID))
+
+		By("observing the NodeImage reported as Available with the upload counted")
+		reconciled := &imagev1alpha1.NodeImage{}
+		Expect(k8sClient.Get(ctx, namespacedName, reconciled)).To(Succeed())
+		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageAvailable))
+		Expect(reconciled.Status.Releases).To(ConsistOf("cloud-director-1.2.3"))
+		Expect(reconciled.Annotations).To(HaveKeyWithValue(imagekey.UploadAttemptsAnnotation, "1"))
+
+		By("reconciling again, which confirms the template and resets the counter")
+		_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: namespacedName})
+		Expect(err).NotTo(HaveOccurred())
+
+		newUUID, found := fakeVCD.FindByName(testBrokenImageName)
+		Expect(found).To(BeTrue())
+		Expect(newUUID).To(Equal(uuid))
+
+		Expect(k8sClient.Get(ctx, namespacedName, reconciled)).To(Succeed())
+		Expect(reconciled.Status.State).To(Equal(imagev1alpha1.NodeImageAvailable))
+		Expect(reconciled.Annotations).NotTo(HaveKey(imagekey.UploadAttemptsAnnotation))
 	})
 })
