@@ -168,6 +168,27 @@ func TestCreateOrUpdateImage(t *testing.T) {
 			expectedReleases: []string{"v1.0.0"},
 			expectedState:    images.NodeImagePending,
 		},
+		{
+			name:    "case 5: image awaiting deletion with exhausted upload attempts, should reset attempts",
+			release: "v1.0.0",
+			existingImage: &images.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-image",
+					Namespace: "test-namespace",
+					Annotations: map[string]string{
+						LastUsedAnnotation:       time.Now().Format(time.RFC3339),
+						UploadAttemptsAnnotation: "3",
+					},
+				},
+				Status: images.NodeImageStatus{
+					Releases: []string{},
+					State:    images.NodeImageAwaitingDeletion,
+				},
+			},
+			expectedCreated:  false,
+			expectedReleases: []string{"v1.0.0"},
+			expectedState:    images.NodeImagePending,
+		},
 	}
 
 	for i, tc := range testCases {
@@ -230,6 +251,7 @@ func TestCreateOrUpdateImage(t *testing.T) {
 				assert.Equal(t, tc.expectedState, fetchedImage.Status.State)
 			}
 			assert.NotContains(t, fetchedImage.Annotations, LastUsedAnnotation)
+			assert.NotContains(t, fetchedImage.Annotations, UploadAttemptsAnnotation)
 		})
 	}
 }

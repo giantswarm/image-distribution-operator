@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Reset the upload attempts of a `NodeImage` that was awaiting deletion when a release uses it again, so a counter left over from earlier failed uploads no longer puts it straight into `Error`.
+
 ## [0.13.1] - 2026-11-05
 
 ### Added

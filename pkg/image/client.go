@@ -160,9 +160,12 @@ func (i *Client) AddReleaseToNodeImageStatus(ctx context.Context, image string) 
 	// If the State is empty or AwaitingDeletion, set it to Pending and remove last used annotation
 	resetState := object.Status.State == "" || object.Status.State == images.NodeImageAwaitingDeletion
 	if resetState {
-		// Remove last used annotation if it exists
-		if _, exists := object.Annotations[LastUsedAnnotation]; exists {
+		// Remove last used and stale upload attempts annotations if they exist
+		_, lastUsed := object.Annotations[LastUsedAnnotation]
+		_, attempts := object.Annotations[UploadAttemptsAnnotation]
+		if lastUsed || attempts {
 			delete(object.Annotations, LastUsedAnnotation)
+			delete(object.Annotations, UploadAttemptsAnnotation)
 			// Update metadata first to clear annotation. Update overwrites object with
 			// the stored version, so the status changes below must be applied afterwards.
 			if err := i.Update(ctx, object); err != nil {
