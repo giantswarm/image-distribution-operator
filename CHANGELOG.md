@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-11-09
+
 ### Fixed
 
 - Reset the upload attempts of a `NodeImage` that was awaiting deletion when a release uses it again, so a counter left over from earlier failed uploads no longer puts it straight into `Error`.
@@ -195,7 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-[Unreleased]: https://github.com/giantswarm/image-distribution-operator/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/giantswarm/image-distribution-operator/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/giantswarm/image-distribution-operator/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/giantswarm/image-distribution-operator/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/giantswarm/image-distribution-operator/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/giantswarm/image-distribution-operator/compare/v0.12.0...v0.12.1
