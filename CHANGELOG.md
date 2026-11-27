@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update architect to v10.17.4 (giantswarm/image-distribution-operator#276)
+- Update architect to v10.19.0 (giantswarm/image-distribution-operator#309)
 
 ## [0.13.2] - 2026-11-09
 
