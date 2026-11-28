@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.23
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.2
 	github.com/giantswarm/releases/sdk v0.13.0
-	github.com/johannesboyne/gofakes3 v1.2.0
+	github.com/johannesboyne/gofakes3 v1.3.0
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/stretchr/testify v1.12.1
